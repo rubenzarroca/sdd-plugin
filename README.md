@@ -16,11 +16,11 @@ SDD constrains Claude's behavior through three mechanisms: specs that define wha
 
 ```bash
 # From a marketplace (if published)
-/plugin marketplace add your-org/sdd
-/plugin install sdd
+/plugin marketplace add rubenzarroca/sdd-plugin
+/plugin install sdd-plugin
 
 # During development (local)
-claude --plugin-dir /path/to/sdd
+claude --plugin-dir /path/to/sdd-plugin
 ```
 
 After installing, open any project and run `/sdd:init` to set up the SDD structure.
@@ -154,7 +154,7 @@ Enable them in `.sdd/hooks.json` when you're ready.
 ## Plugin structure
 
 ```
-sdd/
+sdd-plugin/
 ├── .claude-plugin/
 │   └── plugin.json
 ├── skills/
