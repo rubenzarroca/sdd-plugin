@@ -182,6 +182,8 @@ Read `.sdd/state.json` again (to avoid stale data). Apply these updates:
 
 Write the updated state.json.
 
+4. **Sync tasks.md**: Update the task's status line in `specs/{feature-name}/tasks.md`. Locate the `## {TASK-ID}` heading and change `**Status**: pending` to `**Status**: completed` within that task block. Do NOT modify any other task block.
+
 ## Step 8: Report result
 
 Report the outcome of THIS task using this format:
