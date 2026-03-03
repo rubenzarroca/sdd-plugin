@@ -100,12 +100,61 @@ Save the retrospective to `specs/{feature-name}/retro.md` using this format:
 
 Confirm to the user: "Retro saved to `specs/{feature-name}/retro.md`."
 
+## Step 7: Extract learnings to project memory
+
+After saving the retro, synthesize actionable insights and append them to `.sdd/learnings.md`. This file is the project's long-term memory — read by `/sdd:specify`, `/sdd:clarify`, `/sdd:plan`, and `/sdd:tasks` to avoid repeating mistakes across features.
+
+### What to extract
+
+From the retro summary and the user's reflective answers, distill 2-5 concrete, actionable learnings. Each learning must be specific enough that a future skill invocation can act on it. Categorize by the SDD phase it applies to:
+
+- **spec**: insights about spec writing (e.g., "Define error messages in the spec, not during implementation")
+- **planning**: insights about technical design (e.g., "API integrations in this project are more complex than they appear — plan for error handling")
+- **implementation**: insights about coding patterns (e.g., "The ORM doesn't support X natively — use Y pattern instead")
+- **process**: insights about the SDD workflow itself (e.g., "Features touching the database need clarify before plan — too many assumptions otherwise")
+
+### Meta-observation
+
+Add one meta-observation about the project's SDD trajectory — a pattern that spans multiple features, or a shift in how the project is evolving. Examples:
+- "Specs are getting tighter — edge case coverage no longer needs coaching."
+- "This project's complexity is in integrations, not business logic. Plans should weight API contracts higher."
+- "The user catches architectural issues early now — the plan phase moves faster."
+
+If `completed_features <= 1` (first retro), skip the meta-observation — not enough data yet.
+
+### Format
+
+Append to `.sdd/learnings.md` (create the file with a header if it doesn't exist). Use this format:
+
+```markdown
+## {feature-name} ({YYYY-MM-DD})
+
+### Learnings
+- **[phase]**: {actionable insight}
+- **[phase]**: {actionable insight}
+
+### Meta
+{Meta-observation, or omit this section if first retro}
+```
+
+If the file doesn't exist yet, create it with this header before appending:
+
+```markdown
+# Project Learnings
+
+Accumulated insights from feature retrospectives. Read by /sdd:specify, /sdd:clarify, /sdd:plan, and /sdd:tasks to inform future work.
+
+---
+```
+
+Do NOT overwrite existing content — always append. The file grows with each retro.
+
 Then stop. Do NOT suggest any next command.
 
 ## Restrictions
 
-- Do NOT modify `.sdd/state.json`. Retro is read-only on state.
-- Do NOT read specs, plans, tasks, code, or constitution. Only state.json.
+- Do NOT modify `.sdd/state.json`. Retro is read-only on state. The only file retro writes (besides `retro.md`) is `.sdd/learnings.md`.
+- Do NOT read specs, plans, tasks, code, or constitution. Only state.json and `.sdd/learnings.md` (to append).
 - Do NOT auto-suggest this command from any other skill. It is purely user-initiated.
 - Do NOT ask more than 2 reflective questions. Exactly 2.
 - Do NOT grade, score, or rank the user's performance. Observations only.

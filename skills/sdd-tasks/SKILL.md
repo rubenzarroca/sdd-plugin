@@ -39,6 +39,10 @@ Read `.sdd/state.json`. Verify the feature is in state `planned`.
 
 Read `specs/{feature-name}/plan.md`. This is the input for decomposition.
 
+## Step 2b: Read project learnings
+
+Read `.sdd/learnings.md` if it exists. Past retro insights — especially those tagged **implementation** and **process** — should influence task decomposition and complexity sizing. For example, if a past learning says "database migrations always take longer than expected", size those tasks as M instead of S. Do NOT fail if the file doesn't exist.
+
 ## Step 3: Scan project structure
 
 Run a directory listing (e.g., `ls -R` or a tree command) to understand the existing codebase layout. You need to know which files and directories already exist so tasks can reference correct paths.

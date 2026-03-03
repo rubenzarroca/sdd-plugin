@@ -74,6 +74,7 @@ Before starting a spec, Claude MUST:
 1. **Check for PRD:** Read `.sdd/state.json` and check `prd.status`. If `"approved"`, read `specs/prd.md` for content and load it as context. If `prd.status` is `"none"` or `"draft"`, warn the user: "No approved PRD found. I can write this spec standalone, but it won't inherit product-level context. Want to create a PRD first with /sdd:prd?"
 2. **Check for constitution:** Read `constitution.md` if it exists. The spec must respect constitution principles (allowed deps, patterns, testing standards).
 3. **Check state:** Read `.sdd/state.json`. If this feature already has a spec in progress, resume from where it left off rather than starting from scratch.
+4. **Check for project learnings:** Read `.sdd/learnings.md` if it exists. Past retro insights — especially those tagged **spec** — should inform the discovery questions and spec generation. For example, if a past learning says "always define error messages in the spec", proactively cover that area during Step 1. Do NOT fail if the file doesn't exist.
 
 ## Workflow
 

@@ -52,6 +52,10 @@ Read `specs/{feature-name}/spec.md`. This is the full specification including an
 
 Read `constitution.md`. The technical plan must respect every principle defined here. Architecture decisions that conflict with the constitution are not valid options.
 
+## Step 3b: Read project learnings
+
+Read `.sdd/learnings.md` if it exists. Past retro insights — especially those tagged **planning** and **implementation** — should influence architectural decisions and risk assessment. For example, if a past learning says "API integrations are more complex than they appear", factor that into the risk analysis. Do NOT fail if the file doesn't exist.
+
 ## Step 4: Generate the technical plan
 
 Based on the spec and constitution, generate a technical plan with these sections:
