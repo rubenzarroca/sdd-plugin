@@ -1,8 +1,10 @@
 # SDD — Spec Driven Development Plugin for Claude Code
 
-Stop vibe coding. Start building with specs.
+Stop vibe coding. Start building with specs — and learn to write better ones along the way.
 
 SDD is a Claude Code plugin that gives you a structured way to define what you want **before** any code is written. When you ask an AI to build a feature without a plan, it makes hundreds of small decisions on your behalf — and many of them will conflict with each other or with what you actually wanted. SDD prevents that.
+
+But SDD does something else that no other spec framework does: **it teaches you**. Every interaction is designed so that you finish the feature knowing more than when you started — about writing requirements, about making architectural decisions, about thinking in edge cases. The governance keeps your project clean; the pedagogy makes you a better builder.
 
 Every feature goes through a structured lifecycle — specify, clarify, plan, tasks, implement, validate — with human approval at every step. The spec is the source of truth; code is a derived artifact. If code can't be traced back to a requirement, the system catches it.
 
@@ -10,7 +12,23 @@ Every feature goes through a structured lifecycle — specify, clarify, plan, ta
 
 Without specifications constraining the decision space, AI-assisted development becomes a multiplier of both speed and technical debt simultaneously. LLMs generate code by probabilistic token prediction — they don't reason about your architecture, your team's conventions, or your product goals unless you tell them explicitly.
 
-SDD constrains Claude's behavior through three mechanisms: specs that define what to build, a constitution that defines how to build it, and a state machine that enforces the workflow order. Claude can't skip steps, can't auto-advance, and can't implement anything that isn't in a confirmed spec.
+But there's a deeper problem. When AI writes all the code, the human stops learning. You ship features faster but understand them less. Over time you become a passenger in your own codebase — able to describe what you want, unable to evaluate what you got. SDD is designed to prevent both failure modes: the technical debt from unstructured AI, and the skill atrophy from passive AI use.
+
+SDD constrains Claude's behavior through three mechanisms: specs that define what to build, a constitution that defines how to build it, and a state machine that enforces the workflow order. And it uses three pedagogical mechanisms to keep you learning: coaching during spec writing that adapts to your level, pair-programming mode that puts you in the driver's seat for business logic, and retrospectives that consolidate what you learned. Claude can't skip steps, can't auto-advance, and can't implement anything that isn't in a confirmed spec.
+
+## The learning arc
+
+SDD embeds a complete learning cycle into the development workflow. You don't study first and build later — you learn *by building*, with scaffolding that adapts to your level and fades as you improve.
+
+**1. Coached specification** — During `/sdd:specify`, Claude monitors your input for common weaknesses: vague requirements, missing edge cases, untestable criteria, hardcoded values that should be configurable. Instead of silently fixing your input, it offers a concrete alternative using your actual data. If you say "the system must be fast," Claude won't lecture you about non-functional requirements — it will say: "With your current volume of 500 leads per week, a P95 response time of 500ms would keep the team flowing. Want me to set that as the threshold?" The coaching fades as you improve. No levels, no badges — the scaffolding simply becomes unnecessary.
+
+**2. Guided practice** — During `/sdd:implement --pair`, Claude generates the file structure, imports, and boilerplate, but leaves `// TU TURNO:` markers where the business logic goes. You write the parts that matter most. The difficulty adapts: simpler hints on your first features, more open-ended challenges as your profile grows. This is where specification knowledge becomes implementation skill.
+
+**3. Reflection** — After completing a feature, `/sdd:retro` presents a short summary of how your coaching profile changed during the feature and asks exactly 2 reflective questions. It's a 2-minute debrief, not an exam. The goal is to consolidate what you learned so it sticks.
+
+**4. Annotated examples** — `docs/examples/` contains two reference specs (a simple webhook and a complex scoring engine) with inline learning notes explaining *why* each section is written the way it is. These serve as self-study material and a target to aim for.
+
+This approach means that people with strong business context and product taste — but limited technical vocabulary — can produce implementation-ready specs from day one, while building technical literacy organically. And experienced developers get a structured workflow without condescending tutorials.
 
 ## Install
 
@@ -39,14 +57,14 @@ After installing, open any project and run `/sdd:init` to set up the SDD structu
 ```
 /sdd:init my-project          → Analyzes your project, generates CLAUDE.md + constitution
 /sdd:prd                       → (Optional) Guided interview to create a Product Requirements Document
-/sdd:specify auth "OAuth2"     → Creates the spec, asks clarification questions
+/sdd:specify auth "OAuth2"     → Creates the spec with coaching — teaches you to write better requirements
 /sdd:clarify auth              → Finds gaps and ambiguities in the spec
 /sdd:plan auth                 → Generates technical plan + ADR
 /sdd:tasks auth                → Decomposes plan into atomic tasks (5-15 min each)
 /sdd:implement TASK-001        → Implements ONE task, validates, stops
 /sdd:implement TASK-002 --pair → Pair mode: Claude scaffolds, you write the business logic
 /sdd:validate auth             → Drift detection: spec vs code, constitution compliance
-/sdd:retro auth                → (Optional) Quick debrief after completing a feature
+/sdd:retro auth                → (Optional) Reflect on what you learned during this feature
 ```
 
 Every step requires your explicit approval before moving to the next. Claude never auto-advances.
@@ -69,7 +87,7 @@ If CLAUDE.md or other files already exist, init asks before touching them. It ne
 
 Defines what a feature should do using an 11-section methodology. Claude checks for a PRD (to inherit product context), reads your constitution, conducts a focused discovery interview, and generates a comprehensive spec: metadata, context, goals & non-goals, user stories, functional requirements (FR-001...), non-functional requirements (NFR-001...), technical design, data models, API contracts, edge cases (EC-001...), and open questions.
 
-Includes an integrated coaching layer that teaches spec-writing best practices in context (see "Built-in coaching" below).
+This is where the coaching layer lives. Based on constructivist pedagogy, Claude doesn't just accept your input — it monitors for vague language, missing quantifiers, untestable criteria, and implicit assumptions. When it detects a weakness, it offers a rewritten version using your actual project data, so you see exactly what a stronger requirement looks like. The coaching adapts: frequent interventions early on, progressively fewer as your specs improve.
 
 Saved to `specs/[feature]/spec.md`.
 
@@ -91,9 +109,17 @@ Executes one task at a time. Claude reads only the specific task and its listed 
 
 **Pair-programming mode (`--pair`):** Add the `--pair` flag to any implement command (e.g., `/sdd:implement TASK-003 --pair`). Claude generates the file structure, imports, and boilerplate, but leaves `// TU TURNO:` markers in the business logic sections for you to complete. The difficulty of markers adapts to your experience — simpler hints on your first features, more open-ended on later ones. Maximum 3 markers per file, zero on config or boilerplate files. Without the flag, implementation works exactly as before.
 
+This is the bridge between knowing what to build (the spec) and knowing how to build it (the code). Over multiple features, the pair mode trains your pattern recognition for translating requirements into implementations.
+
 ### 7. Validate (`/sdd:validate`)
 
 Drift detection. Compares the spec against the implementation and checks constitution compliance. Reports three things: which requirements are covered, which are missing, and which code doesn't correspond to any requirement (orphan code). For constitution, verifies imports against the allowed list, checks for prohibited patterns, and validates testing standards.
+
+### 8. Retro (`/sdd:retro`)
+
+The final step in the learning cycle. Run it manually after completing a feature — it's never suggested automatically and never blocks anything. Reads the coaching profile and transition history from state.json, presents a 3-5 line summary of what changed in your profile during the feature, and asks exactly 2 reflective questions. Saves the result to `specs/{feature}/retro.md`.
+
+The retro closes the feedback loop: you specified, you built, now you consolidate. Over time, the retro files become a journal of your growth as a spec writer and system thinker.
 
 ## Supporting commands
 
@@ -106,10 +132,6 @@ The constitution wins over CLAUDE.md in conflicts. It's the highest authority in
 ### `/sdd:status`
 
 Session recovery. Shows the active feature, current state, task progress, last completed task, session notes, and any pending alerts. Designed to be the first thing you run when opening a new session. Reads only `state.json` — the lightest command in the plugin.
-
-### `/sdd:retro`
-
-Post-feature retrospective. Run it manually after completing a feature — it's never suggested automatically and never blocks anything. Reads the coaching profile and transition history from state.json, presents a 3-5 line summary of what changed in your profile during the feature, and asks exactly 2 reflective questions. Saves the result to `specs/{feature}/retro.md`. Think of it as a 2-minute debrief, not an exam.
 
 ## State machine
 
@@ -143,7 +165,7 @@ your-project/
 ├── CLAUDE.md                 ← Entry point for Claude (< 60 lines)
 ├── constitution.md           ← Non-negotiable principles (verifiable rules)
 ├── .sdd/
-│   ├── state.json            ← Workflow state machine
+│   ├── state.json            ← Workflow state machine + coaching profile
 │   └── hooks.json            ← Hook config (disabled by default)
 ├── specs/
 │   ├── prd.md                ← Product Requirements Document (optional)
@@ -151,7 +173,7 @@ your-project/
 │       ├── spec.md           ← Feature specification
 │       ├── plan.md           ← Technical plan
 │       ├── tasks.md          ← Task decomposition
-│       └── retro.md          ← Post-feature retrospective (optional)
+│       └── retro.md          ← What you learned (optional)
 └── docs/
     ├── adr/
     │   └── 001-[title].md    ← Architecture Decision Records
@@ -178,25 +200,15 @@ Enable them in `.sdd/hooks.json` when you're ready.
 
 **Governance is programmatic, not conversational.** The constitution isn't a suggestion Claude reads — it's a contract that `/sdd:validate` can verify. Inspired by the agent boundaries pattern from Programmatic Tool Calling.
 
+**Learning is embedded, not bolted on.** The coaching layer, pair mode, and retro aren't optional add-ons — they're integrated into the workflow commands you already use. You learn by doing the work, not by taking a detour.
+
+**The scaffolding fades.** Coaching interventions decrease as your specs improve. Pair-mode markers become more open-ended. The system adapts to your level instead of treating every user the same.
+
 **Human-in-the-loop, always.** No command auto-advances to the next step. Every transition requires explicit user confirmation.
 
 **Context budget by design.** Each command loads only what it needs. `/sdd:status` reads only state.json. `/sdd:implement` reads only the task and its files. No command loads spec + plan + tasks + constitution simultaneously.
 
 **The model is a better programmer than orchestrator.** When available, analysis commands (validate, tasks) use Programmatic Tool Calling to write analysis programs instead of reasoning conversationally over large codebases.
-
-## Built-in coaching
-
-SDD doesn't just generate specs — it teaches you to write better ones. The `/sdd:specify` command includes an integrated coaching layer based on constructivist pedagogy.
-
-When you describe a feature, Claude monitors your input for common weaknesses: vague requirements, missing edge cases, untestable criteria, hardcoded values that should be configurable. Instead of silently accepting or rejecting your input, it offers a concrete, better alternative using your actual data.
-
-For example, if you say "the system must be fast," Claude won't lecture you about non-functional requirements. It will say: "With your current volume of 500 leads per week, a P95 response time of 500ms would keep the team flowing. Want me to set that as the threshold?"
-
-The coaching fades as you improve. Once you start writing quantified requirements on your own, Claude stops intervening. There's no level system, no badges — the scaffolding simply becomes unnecessary.
-
-This approach means that people with strong business context and product taste — but limited technical vocabulary — can produce implementation-ready specs from day one, while building technical literacy organically.
-
-**Want to see what a finished spec looks like?** Check out the annotated examples in `docs/examples/` — a simple webhook spec and a complex scoring engine spec, with inline learning notes explaining why each section is written the way it is.
 
 ## Plugin structure
 
@@ -240,7 +252,7 @@ sdd-plugin/
 
 ## Author
 
-Built by Rubén Zarroca. Designed for teams that want AI-assisted development without the chaos.
+Built by Rubén Zarroca. Designed for teams that want AI-assisted development without the chaos — and without losing the ability to think for themselves.
 
 ## License
 
