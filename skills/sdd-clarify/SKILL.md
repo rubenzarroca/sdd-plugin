@@ -29,13 +29,38 @@ Read `constitution.md` for project context. The constitution's principles should
 
 Do NOT read any other files. Do NOT read source code.
 
+## Step 3b: Read PRD (if available)
+
+Read `specs/prd.md` if it exists. Use it as additional context to validate that the spec aligns with the product vision and module boundaries defined in the PRD. Do NOT fail if no PRD exists.
+
 ## Step 4: Analyze the spec for gaps
 
-Analyze the spec for three types of gaps:
+Analyze the spec across these dimensions:
+
+### 4a. Structural completeness (11-section check)
+
+Verify the spec covers all required sections. For each, check:
+
+- **Data Models (§8):** Are all referenced entities defined with fields, types, and relationships? Are there entities mentioned in requirements that don't appear in the data model?
+- **API Contracts (§9):** Are endpoints defined with request/response payloads and error codes? Are there interactions described in requirements that lack a contract?
+- **Edge Cases (§10):** Are there at least 3 edge cases? Do they cover dirty data, external failures, and boundary values? Each must have an explicit expected behavior.
+- **Open Questions (§11):** Are there unresolved questions that would block implementation? Do they have owners and deadlines?
+
+### 4b. Requirement quality
+
+- **Functional Requirements:** Does each FR have an ID (FR-001, FR-002...)? Is each specific enough to write a test for?
+- **Non-Functional Requirements:** Does each NFR have an ID (NFR-001, NFR-002...)? Is each quantified with a measurable threshold (not "must be fast" but "P95 < 200ms")?
+- **Edge Cases:** Does each EC have an ID (EC-001, EC-002...)?
+
+### 4c. Traditional gap analysis
 
 - **Ambiguities**: terms with multiple possible interpretations, unclear behavior descriptions, vague requirements that could be implemented in conflicting ways.
 - **Unvalidated assumptions**: implicit decisions baked into the spec that were never explicitly confirmed by the user. For example, the spec might assume a specific data format, a particular user flow, or a technology choice without stating why.
 - **Edge cases**: what happens when input is empty, exceeds limits, fails validation, conflicts with existing data, or encounters network/service failures. Look for missing error handling paths and boundary conditions.
+
+### 4d. Coaching notes
+
+If the spec was generated with the coaching layer, some sections might contain inline notes like `[coaching: user accepted P95 < 500ms threshold]`. These are informational and should be **preserved** — they help trace why decisions were made. Do NOT flag them as gaps.
 
 Prioritize questions by impact: ask about gaps that could lead to the biggest implementation problems first.
 

@@ -1,8 +1,20 @@
 {
   "name": "sdd",
   "description": "Specification-Driven Development — a structured workflow for Claude Code that enforces specify → clarify → plan → tasks → implement → validate before writing code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
-    "name": "Evoost"
-  }
+    "name": "Rubén Zarroca"
+  },
+  "skills": [
+    "./skills/sdd-init",
+    "./skills/sdd-prd",
+    "./skills/sdd-specify",
+    "./skills/sdd-clarify",
+    "./skills/sdd-plan",
+    "./skills/sdd-tasks",
+    "./skills/sdd-implement",
+    "./skills/sdd-validate",
+    "./skills/sdd-constitution",
+    "./skills/sdd-status"
+  ]
 }

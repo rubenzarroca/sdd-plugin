@@ -54,6 +54,7 @@ Generate `CLAUDE.md` in the project root. Must be **under 60 lines** and **under
 
 This project uses Specification-Driven Development. All features follow this lifecycle:
 
+0. `/sdd:prd` — (Optional) Generate a Product Requirements Document
 1. `/sdd:specify` — Write a spec from a feature description
 2. `/sdd:clarify` — Identify and resolve gaps in the spec
 3. `/sdd:plan` — Design the technical approach + generate ADR
@@ -151,6 +152,10 @@ Create `.sdd/state.json` with this exact schema (fill project name and timestamp
   "active_feature": null,
   "last_session_notes": null,
   "last_session_end": null,
+  "prd": {
+    "status": "none",
+    "path": "specs/prd.md"
+  },
   "features": {},
   "allowed_transitions": {
     "drafting": ["specified"],
@@ -212,12 +217,14 @@ Created:
   specs/             — Feature specifications directory
   docs/adr/          — Architecture Decision Records directory
 
-Next: when you're ready to start a feature, run /sdd:specify {feature description}
+Next steps:
+  - If this is a new product, start with /sdd:prd to define the product vision and scope
+  - If you already have a clear product definition, go directly to /sdd:specify {feature description}
 ```
 
 ## Restrictions
 
-- Do NOT suggest running `/sdd:specify` after init. Present the summary and stop.
+- Do NOT auto-advance to `/sdd:prd` or `/sdd:specify` after init. Present the summary and stop.
 - Do NOT read source code files. Only read directory listing and package manifest.
 - Do NOT make assumptions about project architecture beyond what the manifest and directory structure reveal.
 - If the user's answers to constitution questions are vague, ask for clarification. Do not generate vague principles.

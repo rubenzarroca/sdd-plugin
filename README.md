@@ -14,12 +14,21 @@ SDD constrains Claude's behavior through three mechanisms: specs that define wha
 
 ## Install
 
-```bash
-# From a marketplace (if published)
-/plugin marketplace add rubenzarroca/sdd-plugin
-/plugin install sdd-plugin
+### From GitHub
 
-# During development (local)
+```bash
+# 1. Add the repo as a marketplace
+/plugin marketplace add rubenzarroca/sdd-plugin
+
+# 2. Install the plugin (choose scope: user, project, or local)
+/plugin install sdd@rubenzarroca-sdd-plugin
+```
+
+Or use the interactive UI: run `/plugin`, go to **Discover**, and select **sdd**.
+
+### Local development
+
+```bash
 claude --plugin-dir /path/to/sdd-plugin
 ```
 
@@ -29,6 +38,7 @@ After installing, open any project and run `/sdd:init` to set up the SDD structu
 
 ```
 /sdd:init my-project          → Analyzes your project, generates CLAUDE.md + constitution
+/sdd:prd                       → (Optional) Guided interview to create a Product Requirements Document
 /sdd:specify auth "OAuth2"     → Creates the spec, asks clarification questions
 /sdd:clarify auth              → Finds gaps and ambiguities in the spec
 /sdd:plan auth                 → Generates technical plan + ADR
@@ -41,6 +51,12 @@ Every step requires your explicit approval before moving to the next. Claude nev
 
 ## The workflow
 
+### 0. PRD (`/sdd:prd`)
+
+Optional but recommended as the first step after init. Generates a Product Requirements Document through a guided interview. Defines the product vision, target users, modules, scope boundaries, and success criteria. The PRD feeds context to all downstream `/sdd:specify` commands.
+
+Saved to `specs/prd.md`.
+
 ### 1. Initialize (`/sdd:init`)
 
 Run once per project. Detects your stack, generates a CLAUDE.md (< 60 lines, progressive disclosure) and walks you through creating a constitution.md with your project's non-negotiable principles. Also creates the state machine (`.sdd/state.json`) and folder structure (`specs/`, `docs/adr/`).
@@ -49,7 +65,9 @@ If CLAUDE.md or other files already exist, init asks before touching them. It ne
 
 ### 2. Specify (`/sdd:specify`)
 
-Defines what a feature should do. Claude reads your constitution to respect project principles, asks up to 5 focused clarification questions, and generates a spec with context, problem statement, solution, functional requirements, non-functional requirements, acceptance criteria (Given/When/Then), and explicit out of scope.
+Defines what a feature should do using an 11-section methodology. Claude checks for a PRD (to inherit product context), reads your constitution, conducts a focused discovery interview, and generates a comprehensive spec: metadata, context, goals & non-goals, user stories, functional requirements (FR-001...), non-functional requirements (NFR-001...), technical design, data models, API contracts, edge cases (EC-001...), and open questions.
+
+Includes an integrated coaching layer that teaches spec-writing best practices in context (see "Built-in coaching" below).
 
 Saved to `specs/[feature]/spec.md`.
 
@@ -90,8 +108,10 @@ Session recovery. Shows the active feature, current state, task progress, last c
 Every feature moves through a strict lifecycle:
 
 ```
-drafting → specified → clarified → planned → tasked → implementing → validating → completed
+[prd] → drafting → specified → clarified → planned → tasked → implementing → validating → completed
 ```
+
+The PRD phase is optional — projects without a PRD start directly at `drafting`.
 
 Transitions are enforced. You can't implement without a confirmed plan. You can't validate without completing all tasks. If you need to go back:
 
@@ -118,6 +138,7 @@ your-project/
 │   ├── state.json            ← Workflow state machine
 │   └── hooks.json            ← Hook config (disabled by default)
 ├── specs/
+│   ├── prd.md                ← Product Requirements Document (optional)
 │   └── [feature-name]/
 │       ├── spec.md           ← Feature specification
 │       ├── plan.md           ← Technical plan
@@ -151,6 +172,18 @@ Enable them in `.sdd/hooks.json` when you're ready.
 
 **The model is a better programmer than orchestrator.** When available, analysis commands (validate, tasks) use Programmatic Tool Calling to write analysis programs instead of reasoning conversationally over large codebases.
 
+## Built-in coaching
+
+SDD doesn't just generate specs — it teaches you to write better ones. The `/sdd:specify` command includes an integrated coaching layer based on constructivist pedagogy.
+
+When you describe a feature, Claude monitors your input for common weaknesses: vague requirements, missing edge cases, untestable criteria, hardcoded values that should be configurable. Instead of silently accepting or rejecting your input, it offers a concrete, better alternative using your actual data.
+
+For example, if you say "the system must be fast," Claude won't lecture you about non-functional requirements. It will say: "With your current volume of 500 leads per week, a P95 response time of 500ms would keep the team flowing. Want me to set that as the threshold?"
+
+The coaching fades as you improve. Once you start writing quantified requirements on your own, Claude stops intervening. There's no level system, no badges — the scaffolding simply becomes unnecessary.
+
+This approach means that people with strong business context and product taste — but limited technical vocabulary — can produce implementation-ready specs from day one, while building technical literacy organically.
+
 ## Plugin structure
 
 ```
@@ -159,6 +192,8 @@ sdd-plugin/
 │   └── plugin.json
 ├── skills/
 │   ├── sdd-init/
+│   │   └── SKILL.md
+│   ├── sdd-prd/
 │   │   └── SKILL.md
 │   ├── sdd-specify/
 │   │   └── SKILL.md
@@ -181,7 +216,7 @@ sdd-plugin/
 
 ## Version
 
-0.1.0 — Initial release.
+0.2.0 — PRD skill, 11-section specify methodology with integrated coaching, requirement ID traceability.
 
 ## Author
 

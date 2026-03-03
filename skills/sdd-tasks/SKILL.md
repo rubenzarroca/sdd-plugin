@@ -34,10 +34,13 @@ Do NOT read the contents of any source code files. Only the directory structure.
 
 ## Step 5: Decompose into tasks
 
+Read `specs/{feature-name}/spec.md` alongside the plan to extract requirement IDs (FR-xxx, NFR-xxx, EC-xxx). Each task must trace back to at least one requirement.
+
 Break the plan into atomic tasks. Each task must have:
 
 - **ID**: `TASK-NNN` format, sequential starting from TASK-001.
 - **Title**: Short, descriptive, starts with a verb (e.g., "Create auth middleware", "Add session validation").
+- **Requirements**: List of requirement IDs this task addresses (e.g., FR-001, FR-002, NFR-001, EC-003). Every FR, NFR, and EC from the spec must be covered by at least one task.
 - **Status**: `pending` (all tasks start as pending).
 - **Estimated**: 5-15 minutes. If a task would take longer, split it into smaller tasks.
 - **Depends on**: List of TASK-NNN IDs this task requires to be completed first, or "none".
@@ -65,6 +68,7 @@ Save the decomposition to `specs/{feature-name}/tasks.md` using this exact forma
 ## TASK-001: {Title}
 
 **Status**: pending
+**Requirements**: {FR-001, FR-002, NFR-001, EC-003...}
 **Estimated**: {N} min
 **Depends on**: none
 **Files**: {file1}, {file2}
@@ -102,6 +106,7 @@ Present the full task list to the user for review. Include a summary showing:
 - Total number of tasks
 - Total estimated time
 - Dependency chain overview (which tasks are independent, which form critical paths)
+- Requirement traceability: confirm every FR-xxx, NFR-xxx, and EC-xxx from the spec is covered by at least one task. If any requirement is orphaned (not covered by any task), flag it explicitly
 
 ## PTC Mode
 
@@ -151,7 +156,7 @@ Wrap all file reads in try/except to handle permission errors or encoding issues
 ## Restrictions
 
 - Do NOT suggest /sdd:implement. Present the tasks and wait for confirmation.
-- Context budget: Read plan.md + directory listing. Do NOT read source code files.
+- Context budget: Read plan.md + spec.md (for requirement IDs) + directory listing. Do NOT read source code files.
 - Each task must be implementable in 5-15 minutes. If a task would be larger, split it.
 - Each task must be testable in isolation.
 - No task may depend on a task that comes after it.

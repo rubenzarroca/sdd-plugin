@@ -1,155 +1,328 @@
 ---
 name: sdd-specify
-description: "Create a feature specification from a description. Use when the user wants to spec a feature, write a spec, define requirements, says 'specify feature', 'write spec for', 'define what X should do', or starts describing a new feature to build. First step of SDD after init."
-argument-hint: "feature-name: description of the feature"
-user-invokable: true
+description: >
+  Generate a comprehensive feature specification following the SDD 11-section methodology,
+  with integrated technical coaching that teaches spec-writing best practices in context.
+  Use when the user says "specify", "create spec", "write spec", "define feature",
+  "especificar", or runs /sdd:specify. This skill produces specs that are detailed enough
+  for an LLM to implement directly: context, goals, user stories, functional and non-functional
+  requirements, technical design, data models, API contracts, edge cases, and open questions.
+  Always check for a PRD in specs/prd.md first to inherit product-level context.
+  The spec is the source of truth — code is a derived artifact.
+  When the user writes something vague, ambiguous, or technically weak, Claude does NOT
+  just accept it — it coaches the user in real-time with concrete suggestions grounded in
+  their actual feature, teaching technical literacy through practice, not theory.
+disable-model-invocation: true
 ---
 
-# /sdd:specify — Create a feature specification
+# SDD Specify — Feature Specification Generator (11-Section Methodology)
 
-You are creating a feature specification from a description. This is the first step in the SDD lifecycle after init. Follow these steps exactly, in order. Do NOT skip steps. Do NOT read source code — only constitution.md and state.json.
+A feature spec is the bridge between product vision (PRD) and implementation. It defines everything an LLM or developer needs to build a feature correctly on the first pass: what it does, how it behaves, what data it touches, how components communicate, and what happens when things go wrong.
 
-## Step 1: Read and validate state
+## Integrated Coaching Philosophy
 
-Read `.sdd/state.json`. Check if the feature name (parsed from arguments in Step 3) already exists in `features`:
+This skill has a dual purpose: it generates specs AND teaches the user to write better specs over time. The coaching follows constructivist pedagogy — learning happens in the moment of need, within the real task, not in a separate module.
 
-- If it exists with state `specified`: warn the user that re-specifying will overwrite the existing spec. Ask for confirmation before continuing.
-- If it exists with a state **beyond** `specified` (e.g., `clarified`, `planned`, `tasked`, `implementing`, `validating`, `completed`): warn the user that re-specifying will reset the feature to `specified` state, potentially invalidating clarifications, plans, tasks, and implementation work. Ask for explicit confirmation before continuing.
-- If it doesn't exist: proceed normally.
+### How Coaching Works
 
-## Step 2: Read constitution
+Claude monitors everything the user provides during the specify workflow. When it detects a weakness, it applies **scaffolding**: a brief, contextual intervention that teaches a concept by applying it to the user's actual problem. The user learns without knowing they're being taught.
 
-Read `constitution.md` to internalize the project's non-negotiable principles. These principles must inform the spec — every requirement you generate should be compatible with the constitution. Do NOT read any other files.
+**Scaffolding triggers and responses:**
 
-## Step 3: Parse arguments
+| What Claude detects | What Claude does |
+|---|---|
+| Vague requirement ("must be fast", "should handle many users", "needs to be secure") | Offers a concrete, quantified alternative using the user's own data. Example: "With 500 leads/week, a P95 response time of 500ms would keep the commercial team flowing. Want me to set that as the threshold?" |
+| Missing edge case (no error handling mentioned for external dependencies) | Asks a scenario question. Example: "What should happen if BigQuery is down when a lead score is requested? Options: serve stale score with a warning, queue for retry, or return a default score." |
+| Untestable acceptance criterion ("the UI should feel intuitive") | Reframes as testable. Example: "'Feel intuitive' is hard to test. Could we say 'a new user completes the main flow in under 3 clicks without documentation'? That's verifiable." |
+| No non-goals defined | Prompts with a concrete example. Example: "What should this feature NOT do? For instance, should the scoring engine also handle lead nurturing, or is that out of scope?" |
+| Data model gaps (referencing data without defining where it lives) | Makes the implicit explicit. Example: "You mentioned 'budget declared by the lead.' Where does this live? Is it a field in the CRM, a form input, or derived from behavior? This matters for the data model." |
+| Ambiguous relationship between entities | Asks for cardinality. Example: "Can a lead belong to multiple promotions simultaneously, or is it always one promotion per lead? This changes the data model significantly." |
+| Missing API contract details | Asks about the contract. Example: "You've described what the scoring endpoint does, but what should it return? A score number? A tier? The full breakdown? Defining the response shape now prevents refactoring later." |
+| Security or compliance blind spot | Flags the gap. Example: "This feature processes phone numbers and emails. Does it need to comply with GDPR? If so, we need a consent field and a data retention policy in the spec." |
+| Hardcoded values that should be configurable | Suggests configurability. Example: "You said the hot threshold is 75. What if that changes next quarter? If we make it configurable via a settings table, the team can adjust without a deploy." |
+| Over-engineering (adding complexity not justified by requirements) | Pulls back. Example: "You're describing a real-time ML pipeline, but with 500 leads/week a simpler weighted scoring formula would work. We can always upgrade to ML later if the volume justifies it. Want to start simpler?" |
 
-Parse the feature name and description from `$ARGUMENTS`. Expected format:
+### Scaffolding Rules
 
-```
-/sdd:specify feature-name: A description of what the feature should do
-```
+1. **Contextual, never abstract.** Never say "you should quantify your NFRs." Instead, offer the quantified version using their data. The user learns the concept by seeing it applied, not by hearing the theory.
 
-If `$ARGUMENTS` is empty or doesn't contain a clear feature name and description, ask the user to provide them in the format above. Do not proceed without both.
+2. **One intervention at a time.** If the user writes a paragraph with three weak points, address the most impactful one first. Come back to the others naturally as the spec develops.
 
-Extract:
-- **Feature name**: the part before the colon (kebab-case, e.g., `user-auth`, `dark-mode`, `export-csv`). If not kebab-case, convert it.
-- **Description**: everything after the colon.
+3. **Suggest, don't impose.** Every coaching intervention ends with a question or option, never a mandate. "Want me to set that as the threshold?" not "I'm setting the threshold to 500ms."
 
-## Step 4: Ask clarification questions
+4. **Fade as competence grows.** If the user starts writing quantified NFRs on their own, stop coaching on NFRs. The scaffolding disappears as the user internalizes the patterns. There is no "level" system or explicit progression — it's organic.
 
-Analyze the description for gaps, ambiguities, and missing details. Identify up to 5 areas where the description is insufficient to write a complete spec.
+5. **Celebrate progress implicitly.** When the user writes something well, don't say "great job on that testable requirement!" Instead, build on it naturally: "That's a clean requirement. For the P99 case, do you want a different threshold or same?" This acknowledges competence without being patronizing.
 
-**Ask questions ONE AT A TIME.** Ask the first question, wait for the user's answer, then ask the next question. Do NOT batch all questions together. Each question should build on previous answers when relevant.
+6. **Business language first, technical terms as bridges.** Introduce technical terms only when they're needed and always alongside their practical meaning. "Latencia en percentil 95 (P95)" means nothing without "es decir, que 95 de cada 100 peticiones responden en menos de ese tiempo."
 
-Types of gaps to look for:
-- **Scope boundaries**: What is explicitly NOT included?
-- **User interactions**: Who uses this and how?
-- **Edge cases**: What happens when inputs are invalid, empty, or at limits?
-- **Integration points**: How does this connect to existing functionality?
-- **Non-functional expectations**: Performance targets, security requirements, accessibility needs?
+7. **Use the user's domain as the teaching medium.** Real estate, leads, promotions, commercial teams — these are the anchors. Every technical concept gets explained through the user's own business context, never through generic examples.
 
-If the description is exceptionally detailed and you identify fewer than 5 gaps, ask only the questions that matter. Do not invent unnecessary questions.
+---
 
-After all questions are answered, proceed to Step 5.
+## Pre-flight Checks
 
-## Step 5: Generate spec.md
+Before starting a spec, Claude MUST:
 
-Generate the specification document with these exact sections:
+1. **Check for PRD:** Read `specs/prd.md`. If it exists and is approved, load it for context. If it doesn't exist, warn the user: "No PRD found. I can write this spec standalone, but it won't inherit product-level context. Want to create a PRD first with /sdd:prd?"
+2. **Check for constitution:** Read `constitution.md` if it exists. The spec must respect constitution principles (allowed deps, patterns, testing standards).
+3. **Check state:** Read `.sdd/state.json`. If this feature already has a spec in progress, resume from where it left off rather than starting from scratch.
+
+## Workflow
+
+### Step 1: Feature Discovery
+
+Ask focused questions to understand the feature. Ask ONE AT A TIME. Wait for confirmation before proceeding. Apply coaching scaffolding as answers come in.
+
+**Always ask:**
+
+1. "What is the name of this feature and what problem does it solve?"
+   - *Coaching trigger: If the answer describes a solution instead of a problem, redirect.* Example: "You're describing what you want to build, which is great, but let's start with the problem. What's happening today that's painful?"
+
+2. "Who is the primary user of this feature?" (Cross-reference with PRD personas if available)
+   - *Coaching trigger: If the answer is too broad ("everyone", "the team"), narrow it.* Example: "Who specifically feels the most pain? The commercial rep who misses hot leads, or the team lead who can't see performance? Their needs might shape this differently."
+
+3. "Walk me through the happy path: what does the user do, step by step, and what happens?"
+   - *Coaching trigger: If the path is too high-level, probe for specifics.* Example: "You said 'the system calculates a score.' Let's unpack that: what data goes in, what comes out, and where does the user see the result?"
+
+**Then, based on answers, ask up to 3 targeted follow-up questions.** Focus on:
+- Data: "What information does this feature need to work? Where does it come from?"
+- Integrations: "Does this feature need to talk to any external system?"
+- Constraints: "Are there any hard constraints I should know about? (performance, compliance, budget)"
+
+**Maximum 7 questions total.** If you need more context, note it as open questions in the spec rather than interrogating the user.
+
+### Step 2: Generate the Spec
+
+Create the spec at `specs/[feature-name]/spec.md`. Follow this exact structure. Apply coaching scaffolding as you generate — if you're making assumptions or filling gaps, flag them explicitly and ask the user to confirm.
 
 ```markdown
-# Spec: {Feature Name}
+# [Feature Name] — Specification
 
-## Context
+**Version:** 1.0
+**Date:** [YYYY-MM-DD]
+**Status:** Draft | Specified | Clarified
+**PRD Reference:** specs/prd.md (Module: [module name]) | None
+**Constitution:** [Confirmed compliant | No constitution found]
 
-{Why this feature is needed. Reference the project's current state and what gap this fills.}
+---
 
-## Problem Statement
+## 1. Metadata
 
-{What specific problem this feature solves. Be precise — not "users need X" but "currently, users cannot X because Y, which causes Z."}
+| Field | Value |
+|-------|-------|
+| Feature | [name] |
+| Author | [name] |
+| Version | 1.0 |
+| Status | Draft |
+| Created | [YYYY-MM-DD] |
+| Last updated | [YYYY-MM-DD] |
 
-## Proposed Solution
+## 2. Context
 
-{High-level approach. Describe WHAT will be built, not HOW it will be implemented. Implementation details belong in the plan, not the spec.}
+[2-3 paragraphs. Describe the problem this feature solves, why it matters, and what
+the current situation is. If a PRD exists, reference it and explain how this feature
+fits within the broader product. This section should make someone who has never heard
+of this feature understand its purpose in under 60 seconds.]
 
-## Functional Requirements
+## 3. Goals & Non-Goals
 
-1. {Requirement — specific, testable, unambiguous}
-2. {Requirement}
-3. ...
+### Goals
+[3-5 outcomes this feature must achieve. Written as measurable results, not as tasks.
+Each goal should be verifiable — if you can't write a test or metric for it, rewrite it.]
 
-## Non-Functional Requirements
+1. [Goal as measurable outcome]
+2. [Goal as measurable outcome]
 
-1. {Performance, security, accessibility, compatibility, or other quality requirements}
-2. ...
+### Non-Goals
+[What this feature explicitly does NOT do. Each non-goal should explain WHY it's excluded
+to prevent future scope creep. This section is mandatory — a spec without non-goals is incomplete.]
 
-## Acceptance Criteria
+1. [Non-goal] — Why: [reason]
+2. [Non-goal] — Why: [reason]
 
-### AC-1: {Title}
-- **Given** {precondition}
-- **When** {action}
-- **Then** {expected result}
+## 4. User Stories
 
-### AC-2: {Title}
-- **Given** {precondition}
-- **When** {action}
-- **Then** {expected result}
+[Define the actors and their flows. Keep it practical — formal Given/When/Then if the
+team uses BDD, narrative if not. The important thing is that each story is testable.]
 
-{Add as many acceptance criteria as needed to cover all functional requirements.}
+### Actor: [Role]
+**Story:** [What they do and what they expect to happen]
+**Acceptance criteria:**
+- Given [precondition], when [action], then [expected result]
+- Given [precondition], when [action], then [expected result]
 
-## Out of Scope
+### Actor: [Role]
+[Same structure]
 
-- {Explicit exclusion 1}
-- {Explicit exclusion 2}
-- ...
+## 5. Functional Requirements
 
-## Clarifications
+[The "what it does" in detail. Each requirement must be specific enough to write a test for.
+Use IDs (FR-001, FR-002...) so they can be referenced in tasks and validation.]
 
-{Empty — this section is populated by /sdd:clarify}
-```
+- **FR-001:** [Specific, testable requirement]
+- **FR-002:** [Specific, testable requirement]
+- **FR-003:** [Specific, testable requirement]
 
-Every functional requirement must have at least one corresponding acceptance criterion. Acceptance criteria must use Given/When/Then format exclusively.
+## 6. Non-Functional Requirements
 
-## Step 6: Save the spec
+[Performance, security, scalability, observability, accessibility. The constraints that
+define "how well" the feature must work. Use IDs (NFR-001, NFR-002...).]
 
-Save the generated spec to `specs/{feature-name}/spec.md`. Create the `specs/{feature-name}/` directory if it doesn't exist.
+- **NFR-001:** [Quantified constraint, e.g., "P95 response time < 200ms"]
+- **NFR-002:** [Quantified constraint]
+- **NFR-003:** [Quantified constraint]
 
-## Step 7: Update state.json
+## 7. Technical Design
 
-Read `.sdd/state.json` again (to avoid stale data). Update it:
+[Stack, architecture patterns, and decisions already made. Reference the constitution
+if it constrains choices. Explain the WHY behind each decision — this prevents the LLM
+from second-guessing choices during implementation.]
 
-- Add (or replace) the feature entry under `features.{feature-name}`:
+### Stack
+[List technologies and justify each choice briefly]
 
+### Architecture
+[How components are organized. Include a simple diagram if helpful (ASCII or mermaid)]
+
+### Decisions & Rationale
+[Key technical decisions with their reasoning. Format as lightweight ADRs:]
+
+**Decision:** [What was decided]
+**Context:** [Why this decision was needed]
+**Rationale:** [Why this option was chosen over alternatives]
+**Consequences:** [What this means for implementation]
+
+## 8. Data Models
+
+[Entities, fields, types, relationships. Be explicit — this is the section with the
+highest ROI for code generation quality. If the LLM has a precise data model,
+the generated code is consistent from the first attempt.]
+
+### Entity: [name]
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | uuid | yes | Primary key |
+| [field] | [type] | [yes/no] | [description] |
+
+### Relationships
+[How entities relate to each other. One-to-many, many-to-many, etc.]
+
+## 9. API Contracts
+
+[Endpoints, methods, payloads, response codes. This is the contract between components.
+If two features need to communicate, both specs should reference the same contract.]
+
+### `[METHOD] /[endpoint]`
+**Purpose:** [What this endpoint does]
+
+**Request:**
 ```json
 {
-  "state": "specified",
-  "created_at": "{ISO 8601 timestamp}",
-  "transitions": [
-    {
-      "from": null,
-      "to": "specified",
-      "at": "{ISO 8601 timestamp}",
-      "command": "sdd-specify"
-    }
-  ],
-  "tasks": {}
+  "field": "type — description"
 }
 ```
 
-- If the feature already existed (re-spec scenario), preserve `created_at` but reset `transitions` to only the new transition and reset `tasks` to empty.
-- Set `active_feature` to the feature name.
+**Response (200):**
+```json
+{
+  "field": "type — description"
+}
+```
 
-Write the updated state.json.
+**Error codes:**
+| Code | Meaning |
+|------|---------|
+| 400 | [When this happens] |
+| 404 | [When this happens] |
+| 500 | [When this happens] |
 
-## Step 8: Present the spec
+## 10. Edge Cases & Error Handling
 
-Display the complete spec.md content to the user for review. After presenting it, stop and wait for the user's feedback.
+[The section that separates amateur specs from professional ones. List the scenarios that
+are rare but real: dirty data, race conditions, external service failures, boundary values.
+Each edge case must have an explicit expected behavior — never leave it to the LLM to decide.]
 
-## Restrictions
+| ID | Scenario | Expected Behavior |
+|----|----------|-------------------|
+| EC-001 | [What goes wrong] | [What the system should do] |
+| EC-002 | [What goes wrong] | [What the system should do] |
 
-- Do NOT suggest `/sdd:clarify` or `/sdd:plan`. Present the spec and wait for user confirmation.
-- Context budget: Read ONLY `constitution.md` and `.sdd/state.json`. Do NOT read source code files, package manifests, or any other project files.
-- Questions must be asked one at a time, sequentially. Never batch all questions together.
-- Do NOT generate implementation details in the spec. The spec describes WHAT, not HOW.
-- If the user's description is too vague to even start asking questions, say so and ask for a more detailed description before proceeding.
+## 11. Open Questions
 
-$ARGUMENTS
+[Things not yet decided. Each question has an owner and a deadline. This section is a
+signal to the LLM: "don't improvise here, ask instead." Questions resolved during
+clarify should be moved to the relevant section with their answer.]
+
+- [ ] [Question] — Owner: [name] — By: [date]
+- [ ] [Question] — Owner: [name] — By: [date]
+```
+
+### Step 3: Post-Generation Coaching Review
+
+After generating the spec, Claude performs a self-audit before presenting it to the user. For each section, check:
+
+| Section | Coaching check |
+|---|---|
+| Context | Does it explain the problem in business terms? Would a non-technical stakeholder understand? |
+| Goals | Are all goals measurable? Flag any that aren't with a coaching suggestion. |
+| Non-Goals | Are there at least 2? If missing, generate candidates and ask the user to confirm. |
+| User Stories | Are acceptance criteria testable? Flag vague ones. |
+| Functional Reqs | Does each have an ID? Is each specific enough to write a test? |
+| Non-Functional Reqs | Is each quantified? Flag any without numbers: "This NFR says 'must be scalable.' What does that mean for your case? 10K leads? 100K? Let's put a number on it." |
+| Technical Design | Does it respect the constitution? Are decisions justified with rationale? |
+| Data Models | Are all referenced entities defined? Are relationships explicit? |
+| API Contracts | Are request/response shapes defined? Are error codes listed? |
+| Edge Cases | Are there at least 3? If not, suggest likely ones based on the feature. |
+| Open Questions | Are blocking questions flagged? Do they have owners? |
+
+Present the spec to the user with coaching notes inline. Example:
+
+> "I've generated the spec. A few things I'd like you to look at:
+>
+> In NFR-002, you mentioned 'must handle high traffic' — with your current volume of 500 leads/week, I've estimated P95 < 500ms as a reasonable threshold. Does that work?
+>
+> I only found 2 edge cases. What happens if a lead submits the form twice in quick succession? And what if the promotion they selected gets deactivated between form submission and scoring? These are common in proptech flows."
+
+### Step 4: State Update & Handoff
+
+After the user confirms the spec:
+
+1. Update `.sdd/state.json`:
+   ```json
+   {
+     "feature": "[feature-name]",
+     "state": "specified",
+     "spec_path": "specs/[feature-name]/spec.md",
+     "prd_reference": "specs/prd.md"
+   }
+   ```
+
+2. Tell the user: "Spec created at `specs/[feature-name]/spec.md`. Next steps: run `/sdd:clarify [feature-name]` to find gaps, or `/sdd:plan [feature-name]` if you're confident the spec is complete."
+
+3. Do NOT auto-advance. Wait for the user's explicit instruction.
+
+## Calibration Rules
+
+1. **Depth matches complexity.** A webhook spec might leave sections 8-9 minimal. A scoring engine needs all 11 sections fully populated. Claude should calibrate depth to the feature's complexity and risk.
+
+2. **PRD context is inherited, not repeated.** If the PRD explains the problem, the spec's Context section should reference it and add feature-specific context, not copy-paste from the PRD.
+
+3. **Testable or it doesn't count.** Every functional requirement must be specific enough to write a test. "The system should be fast" is not a requirement. "P95 latency < 200ms under 100 concurrent requests" is. When the user writes something untestable, coach them toward a testable version using their own data.
+
+4. **Edge cases are mandatory.** A spec with fewer than 3 edge cases is almost certainly missing something. Push the user to think about dirty data, failures, and race conditions. If they struggle, suggest likely scenarios based on the feature domain.
+
+5. **Constitution compliance is non-negotiable.** If the constitution says "no ORMs", the technical design section cannot include an ORM. If there's a conflict between what the user wants and the constitution, flag it explicitly and ask the user to resolve it.
+
+6. **One question at a time during discovery.** Never batch questions. Wait for the answer before asking the next.
+
+7. **Non-goals are mandatory.** A spec without non-goals is incomplete. If the user doesn't volunteer them, ask: "What should this feature explicitly NOT do?"
+
+8. **Coaching fades with competence.** If the user consistently provides quantified NFRs, stop coaching on quantification. If they always include edge cases, stop prompting for them. The scaffolding is responsive, not a checklist.
+
+## Relationship to Other SDD Commands
+
+- **Upstream:** `/sdd:prd` produces the PRD that provides context to this spec
+- **Downstream:** `/sdd:clarify` analyzes this spec for gaps; `/sdd:plan` generates the technical plan from this spec
+- **Validation:** `/sdd:validate` checks implementation against the requirements defined here (FR-xxx, NFR-xxx)
+- **Cross-reference:** Requirement IDs (FR-001, NFR-001, EC-001) are referenced by `/sdd:tasks` and `/sdd:validate`

@@ -25,10 +25,12 @@ Verify the feature state:
 
 Read `specs/{feature-name}/spec.md`. Extract:
 
-- **Functional requirements**: the numbered list under "## Functional Requirements".
-- **Acceptance criteria**: the Given/When/Then blocks under "## Acceptance Criteria".
+- **Functional requirements**: all FR-xxx entries under "## 5. Functional Requirements".
+- **Non-functional requirements**: all NFR-xxx entries under "## 6. Non-Functional Requirements".
+- **Edge cases**: all EC-xxx entries under "## 10. Edge Cases & Error Handling".
+- **Acceptance criteria**: the Given/When/Then blocks under "## 4. User Stories".
 
-These form the baseline for the coverage check.
+These form the baseline for the coverage check. Every requirement ID (FR-xxx, NFR-xxx, EC-xxx) must be traceable to implementation.
 
 ## Step 3: Read the constitution
 
@@ -54,7 +56,16 @@ If the codebase exceeds what fits in context, limit analysis to files directly r
 
 ## Step 5: Check 1 — Requirement Coverage
 
-For each functional requirement in the spec, determine if there is code that implements it.
+For each requirement ID in the spec, determine if there is corresponding implementation:
+
+### Functional Requirements (FR-xxx)
+For each FR-xxx, determine if there is code that implements it.
+
+### Non-Functional Requirements (NFR-xxx)
+For each NFR-xxx, determine if there is a corresponding test, monitoring, or configuration that enforces it (e.g., a performance test for latency NFRs, rate limiting config for throughput NFRs).
+
+### Edge Cases (EC-xxx)
+For each EC-xxx, determine if there is corresponding error handling code (e.g., try/catch, validation, fallback logic).
 
 Assess each requirement with one of these statuses:
 
@@ -62,7 +73,7 @@ Assess each requirement with one of these statuses:
 - **Missing**: no code found that addresses this requirement.
 - **Partial**: some code exists but the implementation is incomplete (specify what's missing).
 
-Calculate coverage percentage: (covered / total requirements) x 100. Partial counts as 0.5 for the calculation.
+Calculate coverage percentage: (covered / total requirements) x 100. Partial counts as 0.5 for the calculation. Include FR, NFR, and EC counts separately in the report.
 
 ## Step 6: Check 2 — Orphan Code
 
@@ -97,8 +108,17 @@ Present the report in this exact format:
 
 ## Requirement Coverage: {percentage}%
 
-{For each functional requirement, one line:}
+### Functional Requirements
+{For each FR-xxx:}
 {status} FR-{N}: {requirement text} — {implemented in {file} | NOT FOUND | partial (missing: {description})}
+
+### Non-Functional Requirements
+{For each NFR-xxx:}
+{status} NFR-{N}: {requirement text} — {enforced by {test/config/monitor} | NOT FOUND | partial (missing: {description})}
+
+### Edge Cases
+{For each EC-xxx:}
+{status} EC-{N}: {scenario} — {handled in {file} | NOT FOUND | partial (missing: {description})}
 
 ## Orphan Code
 
