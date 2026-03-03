@@ -1,13 +1,13 @@
 ---
 name: sdd-validate
-description: "Verify implementation against the spec and detect drift. Use when the user says 'validate', 'check spec vs code', 'verify implementation', 'are we done', 'any drift', or all tasks are completed and the feature needs final review. Checks coverage, orphan code, and constitution compliance."
+description: "Verify implementation against the spec and detect drift. Use when the user says 'validate', 'check spec vs code', 'verify implementation', 'are we done', 'any drift', or all tasks are completed and the feature needs final review. Checks coverage, orphan code, constitution compliance, and cross-layer consistency."
 argument-hint: "[feature-name]"
 user-invokable: true
 ---
 
 # /sdd:validate — Verify implementation against spec
 
-You are a validation auditor. Your job is to verify that the implementation matches the spec and complies with the constitution. You perform 3 checks: requirement coverage, orphan code detection, and constitution compliance. Follow these steps exactly, in order. Do NOT auto-fix anything — report findings and let the user decide.
+You are a validation auditor. Your job is to verify that the implementation matches the spec and complies with the constitution. You perform 4 checks: requirement coverage, orphan code detection, constitution compliance, and cross-layer consistency. Follow these steps exactly, in order. Do NOT auto-fix anything — report findings and let the user decide.
 
 ## Step 1: Read state and identify feature
 
@@ -99,7 +99,33 @@ Check the feature's code against the constitution:
 
 For each violation, note the file, line, and specific rule violated.
 
-## Step 8: Generate validation report
+## Step 8: Check 4 — Cross-Layer Consistency
+
+For features that span multiple layers (database, API, frontend), verify that data fields referenced in one layer actually exist in the layers that provide them.
+
+### Classify files into layers
+
+Using the files already scanned in Step 4, classify each into its layer:
+
+- **Schema layer**: migrations, ORM models, database schema files (Prisma, Drizzle, SQL migrations, Mongoose models, etc.)
+- **API layer**: controllers, resolvers, route handlers, serializers, API response types
+- **Consumer layer**: frontend components, templates, CLI output formatters — any code that reads and displays data from the API
+
+### Trace field references
+
+1. **Schema → API**: For each field the API layer queries or returns, verify it exists in the schema layer (column, field, or virtual/computed field).
+2. **API → Consumer**: For each field the consumer layer accesses (e.g., `item.profileUrl`, `data.score`), verify the API layer includes it in its response shape.
+
+### What to flag
+
+- **Missing field**: consumer accesses `lead.profileUrl` but the schema has no corresponding column and the API doesn't include it in its response.
+- **Renamed without transform**: schema has `profile_url` but consumer accesses `profileURL` and no serialization or mapping layer transforms the name.
+
+### When to skip
+
+If the feature's files all belong to a single layer (e.g., pure backend logic, pure frontend styling), skip this check and note: "Single-layer feature — cross-layer check not applicable."
+
+## Step 9: Generate validation report
 
 Present the report in this exact format:
 
@@ -136,6 +162,17 @@ No orphan code detected.
 {For violations, include:}
 {file}:{line} — {specific violation description}
 
+## Cross-Layer Consistency
+
+{For each mismatch:}
+{status} {consumer_file}:{line} accesses `{field}` — not found in {provider_layer} ({provider_file})
+
+{Or if clean:}
+No cross-layer mismatches detected.
+
+{Or if single-layer:}
+Single-layer feature — check not applicable.
+
 ## Recommendation
 
 {If ALL checks pass:}
@@ -160,12 +197,13 @@ If the report contains terms the user may not understand, check `.sdd/state.json
 - "Orphan code" → "Code that exists but doesn't match any requirement in the spec — it might be extra or the spec might need updating."
 - "Constitution violation" → "Code that breaks one of the project rules you defined during setup."
 - "Partial coverage" → "The requirement is partly implemented but something is still missing."
+- "Cross-layer mismatch" → "The frontend uses a data field that doesn't exist in the database or API — the code compiles but will break at runtime."
 
 If `milestones.orphan_code_explained` is already `true`, use the terms without re-explaining them.
 
-## Step 9: Handle results
+## Step 10: Handle results
 
-**If ALL checks pass** (100% coverage, no orphans, no constitution violations):
+**If ALL checks pass** (100% coverage, no orphans, no constitution violations, no cross-layer mismatches):
 
 Ask the user: "All checks passed. Do you want to mark {feature-name} as completed?"
 

@@ -22,7 +22,7 @@ SDD embeds a complete learning cycle into the development workflow. You don't st
 
 **1. Coached specification** — During `/sdd:specify`, Claude monitors your input for common weaknesses: vague requirements, missing edge cases, untestable criteria, hardcoded values that should be configurable. Instead of silently fixing your input, it offers a concrete alternative using your actual data. If you say "the system must be fast," Claude won't lecture you about non-functional requirements — it will say: "With your current volume of 500 leads per week, a P95 response time of 500ms would keep the team flowing. Want me to set that as the threshold?" The coaching fades as you improve. No levels, no badges — the scaffolding simply becomes unnecessary.
 
-**2. Guided practice** — During `/sdd:implement --pair`, Claude generates the file structure, imports, and boilerplate, but leaves `// TU TURNO:` markers where the business logic goes. You write the parts that matter most. The difficulty adapts: simpler hints on your first features, more open-ended challenges as your profile grows. This is where specification knowledge becomes implementation skill.
+**2. Guided practice** — During `/sdd:implement --pair`, Claude generates the file structure, imports, and boilerplate, but leaves `// YOUR TURN:` markers where the business logic goes. You write the parts that matter most. The difficulty adapts: simpler hints on your first features, more open-ended challenges as your profile grows. This is where specification knowledge becomes implementation skill.
 
 **3. Reflection** — After completing a feature, `/sdd:retro` presents a short summary of how your coaching profile changed during the feature and asks exactly 2 reflective questions. It's a 2-minute debrief, not an exam. The goal is to consolidate what you learned so it sticks.
 
@@ -107,7 +107,7 @@ Decomposes the plan into atomic tasks. Each task has an ID, title, description, 
 
 Executes one task at a time. Claude reads only the specific task and its listed files (minimal context budget). If it discovers something needed that isn't covered by the task, it reports a blocker instead of implementing it. If validation fails, it retries up to 3 times before asking for help. Never advances to the next task automatically.
 
-**Pair-programming mode (`--pair`):** Add the `--pair` flag to any implement command (e.g., `/sdd:implement TASK-003 --pair`). Claude generates the file structure, imports, and boilerplate, but leaves `// TU TURNO:` markers in the business logic sections for you to complete. The difficulty of markers adapts to your experience — simpler hints on your first features, more open-ended on later ones. Maximum 3 markers per file, zero on config or boilerplate files. Without the flag, implementation works exactly as before.
+**Pair-programming mode (`--pair`):** Add the `--pair` flag to any implement command (e.g., `/sdd:implement TASK-003 --pair`). Claude generates the file structure, imports, and boilerplate, but leaves `// YOUR TURN:` markers in the business logic sections for you to complete. The difficulty of markers adapts to your experience — simpler hints on your first features, more open-ended on later ones. Maximum 3 markers per file, zero on config or boilerplate files. Without the flag, implementation works exactly as before.
 
 This is the bridge between knowing what to build (the spec) and knowing how to build it (the code). Over multiple features, the pair mode trains your pattern recognition for translating requirements into implementations.
 
