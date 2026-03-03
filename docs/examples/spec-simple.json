@@ -1,0 +1,67 @@
+{
+  "feature": "webhook-notification",
+  "version": "1.0",
+  "status": "clarified",
+  "created": "2025-11-15",
+  "updated": "2025-11-18",
+  "prd_reference": "specs/prd.md",
+
+  "requirements": {
+    "functional": [
+      { "id": "FR-001", "text": "System accepts webhook URL registration via POST /webhooks with URL and event list" },
+      { "id": "FR-002", "text": "All webhook payloads include an HMAC-SHA256 signature in the X-Signature-256 header" },
+      { "id": "FR-003", "text": "Failed deliveries retry 3 times with exponential backoff (10s, 60s, 300s)" },
+      { "id": "FR-004", "text": "Users can list, update, and delete their registered webhooks via REST endpoints" }
+    ],
+    "non_functional": [
+      { "id": "NFR-001", "text": "Webhook delivery latency P95 < 5 seconds from event trigger to first HTTP request sent" },
+      { "id": "NFR-002", "text": "Webhook processing must not block the main event pipeline — use async queue" },
+      { "id": "NFR-003", "text": "Signature verification must use constant-time comparison to prevent timing attacks" }
+    ],
+    "edge_cases": [
+      { "id": "EC-001", "scenario": "Target URL returns 5xx on all 3 retries", "behavior": "Mark webhook as failing, notify user via email, stop retrying until manually re-enabled" },
+      { "id": "EC-002", "scenario": "Target URL responds but takes > 30 seconds", "behavior": "Timeout after 30s, count as failed delivery, trigger retry" },
+      { "id": "EC-003", "scenario": "User deletes webhook while deliveries are queued", "behavior": "Cancel pending jobs for that webhook, do not deliver" }
+    ]
+  },
+
+  "data_models": [
+    {
+      "entity": "Webhook",
+      "fields": [
+        { "name": "id", "type": "uuid", "required": true, "description": "Primary key" },
+        { "name": "user_id", "type": "uuid", "required": true, "description": "Owner of the webhook" },
+        { "name": "url", "type": "string", "required": true, "description": "HTTPS endpoint to deliver to" },
+        { "name": "events", "type": "string[]", "required": true, "description": "List of event types to subscribe to" },
+        { "name": "secret", "type": "string", "required": true, "description": "Shared secret for HMAC signing" },
+        { "name": "active", "type": "boolean", "required": true, "description": "Whether the webhook is enabled" },
+        { "name": "created_at", "type": "timestamp", "required": true, "description": "Registration time" }
+      ]
+    }
+  ],
+
+  "api_contracts": [
+    {
+      "method": "POST",
+      "path": "/webhooks",
+      "purpose": "Register a new webhook",
+      "request": { "url": "string", "events": "string[]" },
+      "response_code": 201,
+      "errors": [
+        { "code": 400, "meaning": "Invalid URL format or empty events list" },
+        { "code": 409, "meaning": "URL already registered for this user" }
+      ]
+    }
+  ],
+
+  "clarifications": [
+    {
+      "id": "C-1",
+      "type": "edge_case",
+      "question": "What happens after all 3 retries fail?",
+      "answer": "Mark the webhook as failing and send the user an email. Don't disable it permanently — let them fix the URL and re-enable."
+    }
+  ],
+
+  "open_questions_count": 2
+}

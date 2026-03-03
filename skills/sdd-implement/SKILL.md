@@ -9,6 +9,8 @@ user-invokable: true
 
 You are implementing tasks from the SDD task list. This is the most tightly scoped command in the plugin. You read only task blocks and the files listed in them. In single-task mode, execute one task. In batch mode, execute multiple small tasks in a single pass. Follow these steps exactly, in order. Do NOT skip steps. Do NOT read files beyond what is explicitly listed in the tasks.
 
+**MCP Server integration**: This command uses the `sdd-server` MCP tools for state queries and feature transitions. If the MCP server is not available, fall back to reading/writing `.sdd/state.json` directly.
+
 ## Coaching Layer
 
 During implementation, the user shifts from active participant to observer. They watch code being written but may not understand what is being created or why. Without coaching, this phase becomes a black box. Claude must make the process transparent.
@@ -18,13 +20,13 @@ During implementation, the user shifts from active participant to observer. They
 2. **Connect back to the spec.** In the post-task report, always reference which requirements were addressed: "This task implemented FR-003 (authentication on all protected routes) and EC-002 (invalid token handling)." The user should never wonder "why did that just happen?"
 3. **Explain blockers in user terms.** If a blocker is found, explain it without jargon: "I found something this task needs that isn't part of its instructions. [Plain description]. We have two options: add it to an existing task, or create a new one. What would you prefer?"
 4. **Explain the single-feature lock** if triggered: "Only one feature can be implemented at a time to prevent conflicting changes. Feature `{other}` is currently being built. Complete or pause it before starting this one."
-5. **Calibrate explanation depth.** Read `.sdd/state.json` field `completed_features`:
+5. **Calibrate explanation depth.** Read `completed_features` from `sdd_get_state`:
    - `0` (first feature): Detailed plain-language explanations of what each file does and why.
    - `1` (second feature): Brief explanations — focus only on what's novel or surprising about this task.
    - `2+`: Minimal — announce what you're building in one line, report results. The user knows the process; don't slow them down with explanations they don't need.
 6. **Role-transition coaching.** Check `.sdd/state.json` field `milestones.role_transition_explained`. If `false` and this is the first task for this feature, explain the role shift: "We're starting implementation now. From here, I'll work through each task one at a time and report what I built. Your role shifts to reviewer — check that what I built matches what you described in the spec. If anything looks wrong or confusing, stop me and ask." Then set `milestones.role_transition_explained` to `true`. On subsequent features, skip — the user knows the drill.
 
-## Step 1: Parse task ID and flags
+## Step 1: Parse task ID and find available tasks
 
 Parse the task ID from `$ARGUMENTS` (e.g., `TASK-003`). Also check if `$ARGUMENTS` contains the `--pair` flag.
 
@@ -32,30 +34,29 @@ If `--pair` is present, enable pair-programming mode (see "Pair-Programming Mode
 
 If no task ID is provided:
 
-1. Read `.sdd/state.json`.
-2. Identify the `active_feature`.
-3. Find ALL tasks whose status is `pending` and whose dependencies are all `completed`.
-4. If no pending task with satisfied dependencies exists, report: "All tasks are either completed or blocked. No pending task is available to implement." Then stop.
-5. Read each available task's complexity from `specs/{feature-name}/tasks.md`. If there are multiple available tasks and they are all S-complexity, batch them all as the target set. Otherwise, use the first available task (by ID order) as a single target.
+1. Call the `sdd_next_action` tool with the active feature name to get available tasks.
+2. From the response, look at `next_tasks` — filter for tasks with `status: "pending"` and `ready: true`.
+3. If no tasks have `ready: true`, report: "All tasks are either completed or blocked. No pending task is available to implement." Then stop.
+4. If there are multiple ready tasks and all are S-complexity, batch them all as the target set. Otherwise, use the first available task (by ID order) as a single target.
 
 If one task ID is provided, use it directly. If multiple task IDs are provided (e.g., `TASK-001 TASK-003`), use them as a batch target set — all must be pending with satisfied dependencies.
 
 **Batch execution**: When the target is a batch of tasks, enter batch mode (see "Batch Mode" section below). Batch mode cannot be combined with `--pair`.
 
-## Step 2: Read and validate state
+## Step 2: Validate state via MCP
 
-Read `.sdd/state.json`. Perform these validations in order:
+Call `sdd_get_state` with the feature name. Perform these validations:
 
-1. **Feature state**: Verify the feature (from `active_feature`) is in state `tasked` or `implementing`.
-   - If in `tasked` (this is the first implementation): you will transition the feature to `implementing` in Step 7.
+1. **Feature state**: Verify the feature is in state `tasked` or `implementing`.
+   - If in `tasked` (this is the first implementation): you will transition the feature to `implementing` via the MCP server in Step 7.
    - If in `implementing`: proceed normally.
    - If in any other state: report the current state and stop. Do NOT proceed.
 
-2. **Single feature lock**: Verify no OTHER feature in `state.json` is in `implementing` state. Only one feature can be in `implementing` state at a time. If another feature is already being implemented, report: "Feature `{other-feature}` is currently in `implementing` state. Only one feature can be implemented at a time. Complete or reset that feature before proceeding." Then stop.
-
-3. **Task status**: Verify each target task's status is `pending`.
+2. **Task status**: Verify each target task's status is `pending` (from the `tasks` object in the `sdd_get_state` response).
    - If any task is `completed`: report that it has already been completed and stop.
-   - If any task doesn't exist in the tasks object: report that the task ID was not found and stop.
+   - If any task doesn't exist: report that the task ID was not found and stop.
+
+Note: The single-feature lock and precondition checks are enforced by `sdd_transition` when you attempt the state change in Step 7. You do not need to check them manually here.
 
 ## Step 3: Read the task block
 
@@ -65,9 +66,10 @@ Read `specs/{feature-name}/tasks.md`. Locate the specific task block by its ID h
 - **Description**: what to implement
 - **Files**: the list of files to read and/or modify
 - **Depends on**: task dependencies
+- **Requirements**: FR/NFR/EC IDs this task covers
 - **Validation**: the concrete check to run after implementation
 
-**Dependency check**: For each dependency listed in the task's "Depends on" field, verify it has status `completed` in `state.json`. If any dependency is not completed, report: "Cannot implement {task-id}. The following dependencies are not yet completed: {list of incomplete dependency IDs with their current status}." Then stop.
+**Dependency check**: For each dependency listed in the task's "Depends on" field, verify it has status `completed` in the `sdd_get_state` response. If any dependency is not completed, report: "Cannot implement {task-id}. The following dependencies are not yet completed: {list of incomplete dependency IDs with their current status}." Then stop.
 
 In single-task mode, do NOT read beyond the specific task block. In batch mode, read all task blocks in the batch but nothing else. Do NOT read the spec or plan files.
 
@@ -138,53 +140,49 @@ The implementation may be partially complete. Requesting guidance before proceed
 
 Do NOT attempt further fixes. Wait for the user to provide guidance.
 
-## Step 7: Update state.json
+## Step 7: Update state
 
-Read `.sdd/state.json` again (to avoid stale data). Apply these updates:
+This step uses MCP tools for feature transitions and direct state.json writes for task status.
 
-1. **First task transition**: If the feature was in state `tasked` (this is the first task being implemented), transition it:
-   - Validate the transition: check `allowed_transitions` in state.json to confirm that `"tasked"` allows transitioning to `"implementing"`. If the transition is not listed, warn the user and do not proceed.
-   - Set the feature's `state` to `implementing`.
-   - Set `active_feature` to the feature name.
-   - Append a transition record to the feature's `transitions` array:
+### 7a: Mark task completed in state.json
 
-   ```json
-   {
-     "from": "tasked",
-     "to": "implementing",
-     "at": "{ISO 8601 timestamp}",
-     "command": "sdd-implement"
-   }
-   ```
+Read `.sdd/state.json`. Update the task entry in the feature's `tasks` object:
 
-2. **Mark task completed**: Update the task entry in the feature's `tasks` object:
-
-   ```json
-   "{TASK-ID}": {
-     "status": "completed",
-     "title": "{task title}",
-     "completed_at": "{ISO 8601 timestamp}"
-   }
-   ```
-
-3. **Check for feature completion**: After marking the task, check if ALL tasks in the feature's `tasks` object now have status `completed`. If yes:
-   - Validate the transition: check `allowed_transitions` in state.json to confirm that `"implementing"` allows transitioning to `"validating"`. If the transition is not listed, warn the user and do not proceed.
-   - Transition the feature state to `validating`.
-   - Append a transition record:
-
-   ```json
-   {
-     "from": "implementing",
-     "to": "validating",
-     "at": "{ISO 8601 timestamp}",
-     "command": "sdd-implement"
-   }
-   ```
-   - Report: "All tasks completed. Feature `{feature-name}` is ready for validation. Run `/sdd:validate` to verify against spec."
+```json
+"{TASK-ID}": {
+  "status": "completed",
+  "title": "{task title}",
+  "completed_at": "{ISO 8601 timestamp}"
+}
+```
 
 Write the updated state.json.
 
-4. **Sync tasks.md**: Update the task's status line in `specs/{feature-name}/tasks.md`. Locate the `## {TASK-ID}` heading and change `**Status**: pending` to `**Status**: completed` within that task block. Do NOT modify any other task block.
+### 7b: Feature transition (first task only)
+
+If the feature was in state `tasked` (this is the first task being implemented), call `sdd_transition`:
+
+```
+sdd_transition(feature: "{feature-name}", to: "implementing", command: "sdd-implement")
+```
+
+If the transition fails (e.g., feature lock), report the error from the MCP response — it includes a human-readable `hint` field. Then stop.
+
+### 7c: Check for feature completion
+
+After marking the task, check if ALL tasks in the feature's `tasks` object now have status `completed`. If yes, call `sdd_transition`:
+
+```
+sdd_transition(feature: "{feature-name}", to: "validating", command: "sdd-implement")
+```
+
+If the transition succeeds, report: "All tasks completed. Feature `{feature-name}` is ready for validation. Run `/sdd:validate` to verify against spec."
+
+If the transition fails, report the MCP error and its hint.
+
+### 7d: Sync tasks.md
+
+Update the task's status line in `specs/{feature-name}/tasks.md`. Locate the `## {TASK-ID}` heading and change `**Status**: pending` to `**Status**: completed` within that task block. Do NOT modify any other task block.
 
 ## Step 8: Report result
 
@@ -206,18 +204,17 @@ Validation:
 Feature progress: {N}/{M} tasks completed
 ```
 
-Then check if there are multiple pending tasks whose dependencies are now all satisfied. If so, list them and suggest parallel execution:
+Then call `sdd_next_action` with the feature name to get the current available tasks. From the response, list tasks with `ready: true`:
 
 ```
-Ready to run in parallel:
-- TASK-004: {title}
-- TASK-005: {title}
+Ready to implement next:
+- {TASK-ID}: {title} (complexity: {S/M/L})
+- {TASK-ID}: {title} (complexity: {S/M/L})
 
-These tasks have no dependencies on each other and can be implemented simultaneously.
-Run: /sdd:implement TASK-004 and /sdd:implement TASK-005
+These tasks have satisfied dependencies and can be implemented now.
 ```
 
-If only one task is available, suggest it normally. If no tasks are available, state that all remaining tasks are blocked or completed.
+If no tasks have `ready: true`, state that all remaining tasks are blocked or completed.
 
 ---
 
@@ -232,7 +229,9 @@ Execute Steps 3-7 as a loop over each task in the batch, in ID order. For each t
 2. Read its files (Step 4)
 3. Implement it (Step 5)
 4. Validate it (Step 6)
-5. Update state.json and sync tasks.md (Step 7)
+5. Update state: mark task completed in state.json and sync tasks.md (Step 7a, 7d)
+
+Feature transitions (Step 7b, 7c) happen once: 7b before the first task in the batch, 7c after the last task if all are completed.
 
 If any task in the batch hits a blocker or fails validation after 3 attempts, stop the entire batch and report progress so far.
 
@@ -259,7 +258,7 @@ What was built:
 Feature progress: {N}/{M} tasks completed
 ```
 
-Then suggest next available tasks as in the standard Step 8.
+Then call `sdd_next_action` to suggest next available tasks as in the standard Step 8.
 
 ---
 
@@ -289,7 +288,7 @@ Insert markers in the code where the user should write logic. Use the appropriat
 
 ### Calibrate marker difficulty
 
-Read `.sdd/state.json` field `completed_features`:
+Read `completed_features` from `sdd_get_state`:
 
 - **`0-1` (first two features):** Markers are simple and include a hint.
   ```typescript
@@ -327,7 +326,7 @@ Do NOT run validation (Step 6) in pair mode. The user must complete their sectio
 - Do NOT implement anything not described in the task, even if it seems obviously needed. Report it as a blocker.
 - Context budget: Read ONLY the specific task block from tasks.md + the files listed in the task's Files field. Do NOT read the full tasks.md, the spec, the plan, or unrelated source files.
 - Maximum 3 validation retry attempts. After 3 failures, stop and ask for guidance.
-- Only one feature can be in `implementing` state at a time. If another feature is already being implemented, stop and report.
+- The single-feature lock is enforced by the MCP server's `sdd_transition` tool. If you encounter a lock error, report the MCP error message and stop.
 - Do NOT modify files not listed in the task's Files field.
 - Do NOT advance the feature state beyond `validating`. The `/sdd:validate` command handles the transition to `completed`.
 

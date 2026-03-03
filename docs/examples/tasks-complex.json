@@ -1,0 +1,135 @@
+{
+  "feature": "lead-scoring",
+  "generated": "2025-10-29",
+
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Create Lead, LeadScore, and ScoringConfig database schemas",
+      "complexity": "M",
+      "requirements": ["FR-001", "FR-003"],
+      "depends_on": [],
+      "files": ["prisma/schema.prisma", "prisma/migrations/001_lead_scoring.sql"],
+      "description": "Create all three tables from the data model: Lead, LeadScore, ScoringConfig. Add Prisma schema definitions with relationships (Lead 1:N LeadScore). Seed ScoringConfig with default weights.",
+      "validation": "Migration runs, all 3 tables exist with correct fields, seed data present in ScoringConfig"
+    },
+    {
+      "id": "TASK-002",
+      "title": "Implement scoring calculation service",
+      "complexity": "M",
+      "requirements": ["FR-001", "FR-002", "FR-007", "NFR-001", "EC-001", "EC-006"],
+      "depends_on": ["TASK-001"],
+      "files": ["src/services/scoring.ts", "src/services/scoring.test.ts"],
+      "description": "Create the core scoring function: read ScoringConfig, calculate weighted sum, classify into tier, clamp to 0-100. Log all calculations with input factors. Handle missing optional factors (score 0, tier cold).",
+      "validation": "Unit tests pass: normal scoring, missing factors returns 0, out-of-range clamped, all calculations logged"
+    },
+    {
+      "id": "TASK-003",
+      "title": "Create score trigger endpoint",
+      "complexity": "S",
+      "requirements": ["FR-004", "NFR-005"],
+      "depends_on": ["TASK-002"],
+      "files": ["src/api/scoring.ts", "src/api/scoring.test.ts"],
+      "description": "Create POST /leads/{id}/score endpoint. Reads lead from DB, calls scoring service, stores LeadScore, returns response with factor breakdown.",
+      "validation": "POST returns 200 with score and factors, 404 for missing lead, 422 for insufficient data"
+    },
+    {
+      "id": "TASK-004",
+      "title": "Implement scoring config admin API",
+      "complexity": "M",
+      "requirements": ["FR-003", "NFR-004", "EC-005"],
+      "depends_on": ["TASK-001"],
+      "files": ["src/api/scoring-config.ts", "src/api/scoring-config.test.ts"],
+      "description": "Create GET /scoring/config and PUT /scoring/config endpoints. PUT validates hot > warm threshold, audit-logs changes with user ID and timestamp. Reject invalid weights.",
+      "validation": "GET returns current config, PUT updates and logs, 400 on invalid thresholds, 403 without admin permission"
+    },
+    {
+      "id": "TASK-005",
+      "title": "Create batch re-scoring queue",
+      "complexity": "M",
+      "requirements": ["FR-004", "NFR-002", "EC-002"],
+      "depends_on": ["TASK-002", "TASK-004"],
+      "files": ["src/services/rescore-queue.ts", "src/services/rescore-queue.test.ts"],
+      "description": "Create BullMQ job that re-scores all active leads when config changes. Queue new jobs after in-progress ones complete (no cancellation). Target: 10,000 leads in < 5 minutes.",
+      "validation": "Config change triggers batch job, concurrent config changes queue sequentially, 10k leads scored within 5 min"
+    },
+    {
+      "id": "TASK-006",
+      "title": "Add Redis cache for score lookups",
+      "complexity": "M",
+      "requirements": ["NFR-001", "EC-004"],
+      "depends_on": ["TASK-002"],
+      "files": ["src/services/score-cache.ts", "src/services/score-cache.test.ts"],
+      "description": "Cache latest LeadScore in Redis keyed by lead_id. Invalidate on re-score. Fall back to PostgreSQL when Redis is unavailable. Log cache misses.",
+      "validation": "Cache hit returns score in < 50ms, cache miss falls back to PG, Redis down doesn't break reads"
+    },
+    {
+      "id": "TASK-007",
+      "title": "Implement event-driven score recalculation",
+      "complexity": "M",
+      "requirements": ["FR-004", "EC-003"],
+      "depends_on": ["TASK-002", "TASK-006"],
+      "files": ["src/events/lead-scoring-listener.ts", "src/events/lead-scoring-listener.test.ts"],
+      "description": "Listen for CRM field updates, form submissions, and engagement events. Deduplicate by lead_id with 2-second debounce. Trigger scoring and update cache.",
+      "validation": "Event triggers re-score, duplicate events within 2s are debounced, cache updated after scoring"
+    },
+    {
+      "id": "TASK-008",
+      "title": "Add tier-change notification",
+      "complexity": "S",
+      "requirements": ["FR-005"],
+      "depends_on": ["TASK-002"],
+      "files": ["src/services/tier-notification.ts"],
+      "description": "After each score calculation, compare old and new tier. If tier crossed a boundary, send in-app notification to assigned_rep_id.",
+      "validation": "Tier change from warm to hot sends notification, same-tier re-score does not"
+    },
+    {
+      "id": "TASK-009",
+      "title": "Create scoring report endpoint",
+      "complexity": "M",
+      "requirements": ["FR-006", "NFR-003"],
+      "depends_on": ["TASK-001"],
+      "files": ["src/api/scoring-report.ts", "src/api/scoring-report.test.ts"],
+      "description": "Create GET /scoring/report with date range params. Query LeadScore history, aggregate by tier, calculate conversion rates. Ensure 12-month retention policy in query.",
+      "validation": "Report returns correct distribution and conversion rates for given date range"
+    },
+    {
+      "id": "TASK-010",
+      "title": "Add score history retention policy",
+      "complexity": "S",
+      "requirements": ["NFR-003"],
+      "depends_on": ["TASK-001"],
+      "files": ["src/jobs/score-cleanup.ts"],
+      "description": "Create scheduled job that deletes LeadScore records older than 12 months. Run daily.",
+      "validation": "Job deletes records older than 12 months, retains records within window"
+    }
+  ],
+
+  "coverage": {
+    "FR-001": ["TASK-001", "TASK-002"],
+    "FR-002": ["TASK-002"],
+    "FR-003": ["TASK-001", "TASK-004"],
+    "FR-004": ["TASK-003", "TASK-005", "TASK-007"],
+    "FR-005": ["TASK-008"],
+    "FR-006": ["TASK-009"],
+    "FR-007": ["TASK-002"],
+    "NFR-001": ["TASK-002", "TASK-006"],
+    "NFR-002": ["TASK-005"],
+    "NFR-003": ["TASK-009", "TASK-010"],
+    "NFR-004": ["TASK-004"],
+    "NFR-005": ["TASK-003"],
+    "EC-001": ["TASK-002"],
+    "EC-002": ["TASK-005"],
+    "EC-003": ["TASK-007"],
+    "EC-004": ["TASK-006"],
+    "EC-005": ["TASK-004"],
+    "EC-006": ["TASK-002"]
+  },
+
+  "waves": [
+    { "wave": 1, "tasks": ["TASK-001"] },
+    { "wave": 2, "tasks": ["TASK-002", "TASK-004", "TASK-009", "TASK-010"] },
+    { "wave": 3, "tasks": ["TASK-003", "TASK-005", "TASK-006", "TASK-008"] },
+    { "wave": 4, "tasks": ["TASK-007"] }
+  ]
+}

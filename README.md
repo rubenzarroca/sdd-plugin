@@ -208,6 +208,53 @@ Enable them in `.sdd/hooks.json` when you're ready.
 
 **Context budget by design.** Each command loads only what it needs. `/sdd:status` reads only state.json. `/sdd:implement` reads only the task and its files. No command loads spec + plan + tasks + constitution simultaneously.
 
+## MCP server
+
+The plugin includes an MCP server that provides deterministic state machine enforcement. Instead of skills interpreting state transitions from prose, the server validates them in code — no probabilistic interpretation, no silent state corruption.
+
+### Tools
+
+| Tool | Type | Description |
+|------|------|-------------|
+| `sdd_get_state` | read | Get project or feature state |
+| `sdd_transition` | write | Transition a feature to a new state (enforces preconditions) |
+| `sdd_validate` | read | Structured coverage report (deterministic + heuristic sections) |
+| `sdd_next_action` | read | Available transitions and ready tasks for a feature |
+
+### Setup
+
+Build the server (requires Node.js 16+):
+
+```bash
+cd server
+npm install
+npm run build
+```
+
+Register the server with Claude Code:
+
+```bash
+claude mcp add sdd-server -- node /absolute/path/to/sdd-plugin/server/build/index.js /path/to/your/project
+```
+
+The second argument is the project root where `.sdd/state.json` and `specs/` live. If omitted, the server uses the current working directory.
+
+### How it works
+
+The server operates on three JSON artifacts:
+
+- **`state.json`** (read/write) — the only mutable file. Feature states, task statuses, transitions.
+- **`spec.json`** (read) — structured extract of spec.md. Requirements, data models, API contracts.
+- **`tasks.json`** (read) — task definitions, dependencies, coverage index.
+
+Skills continue to handle the human-facing workflow (coaching, interviews, explanations). The MCP server handles the machine-facing enforcement (state transitions, precondition validation, coverage calculation).
+
+### Architecture note
+
+This version uses MCP (Model Context Protocol) deliberately: the tools run inside Claude Code, where the human drives each step and the server enforces the state machine. This architecture prioritizes learning the SDD workflow through hands-on use — every transition is visible, every precondition is explicit, every decision requires human approval.
+
+In a future version, these same tools could be exposed via the Anthropic API and orchestrated through [Programmatic Tool Calling (PTC)](https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/programmatic-tool-calling), enabling autonomous execution of the full SDD lifecycle (specify, plan, implement, validate) in a single agentic loop. The `sdd_next_action` tool is already designed to serve as the decision input for such an orchestrator.
+
 ## Plugin structure
 
 ```
@@ -238,6 +285,21 @@ sdd-plugin/
 │   │   └── SKILL.md
 │   └── sdd-status/
 │       └── SKILL.md
+├── server/
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       ├── index.ts
+│       ├── types.ts
+│       ├── state/
+│       │   └── manager.ts
+│       ├── artifacts/
+│       │   └── reader.ts
+│       └── tools/
+│           ├── get-state.ts
+│           ├── transition.ts
+│           ├── validate.ts
+│           └── next-action.ts
 ├── docs/
 │   └── examples/
 │       ├── spec-simple.md

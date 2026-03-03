@@ -1,0 +1,87 @@
+{
+  "feature": "webhook-notification",
+  "generated": "2025-11-19",
+
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Create Webhook database schema and migration",
+      "complexity": "S",
+      "requirements": ["FR-001"],
+      "depends_on": [],
+      "files": ["prisma/migrations/001_webhooks.sql", "src/db/schema/webhook.ts"],
+      "description": "Create the Webhook table with all fields from the data model. Add Prisma schema definition and generate migration.",
+      "validation": "Migration runs successfully and Webhook table exists with all 7 fields"
+    },
+    {
+      "id": "TASK-002",
+      "title": "Implement webhook registration endpoint",
+      "complexity": "M",
+      "requirements": ["FR-001", "FR-002"],
+      "depends_on": ["TASK-001"],
+      "files": ["src/api/webhooks.ts", "src/api/webhooks.test.ts"],
+      "description": "Create POST /webhooks endpoint. Validate HTTPS URL, generate HMAC secret, store webhook, return response with secret displayed only on creation.",
+      "validation": "POST /webhooks returns 201 with valid payload, 400 with invalid URL, 409 with duplicate URL"
+    },
+    {
+      "id": "TASK-003",
+      "title": "Implement webhook CRUD endpoints",
+      "complexity": "M",
+      "requirements": ["FR-004"],
+      "depends_on": ["TASK-001"],
+      "files": ["src/api/webhooks.ts"],
+      "description": "Add GET /webhooks (list), PUT /webhooks/:id (update), DELETE /webhooks/:id to the webhooks router. DELETE must cancel pending deliveries (EC-003).",
+      "validation": "GET returns user's webhooks, PUT updates URL/events, DELETE removes and cancels pending jobs"
+    },
+    {
+      "id": "TASK-004",
+      "title": "Create webhook delivery queue with retry logic",
+      "complexity": "M",
+      "requirements": ["FR-003", "NFR-001", "NFR-002", "EC-001", "EC-002"],
+      "depends_on": ["TASK-001"],
+      "files": ["src/services/webhook-delivery.ts", "src/services/webhook-delivery.test.ts"],
+      "description": "Create BullMQ job queue for webhook delivery. Implement retry with exponential backoff (10s, 60s, 300s). Set 30s timeout per request. On exhaustion, mark webhook as failing and notify user.",
+      "validation": "Delivery job retries 3 times on failure, respects backoff schedule, marks webhook as failing after exhaustion"
+    },
+    {
+      "id": "TASK-005",
+      "title": "Add HMAC-SHA256 payload signing",
+      "complexity": "S",
+      "requirements": ["FR-002", "NFR-003"],
+      "depends_on": ["TASK-004"],
+      "files": ["src/services/webhook-signing.ts", "src/services/webhook-signing.test.ts"],
+      "description": "Create signing utility that generates HMAC-SHA256 signature using the webhook's secret. Use constant-time comparison for verification. Attach signature as X-Signature-256 header.",
+      "validation": "Signature matches expected HMAC-SHA256 output, constant-time comparison confirmed in test"
+    },
+    {
+      "id": "TASK-006",
+      "title": "Wire event handler to delivery queue",
+      "complexity": "S",
+      "requirements": ["FR-001", "NFR-001", "EC-003"],
+      "depends_on": ["TASK-004", "TASK-005"],
+      "files": ["src/events/webhook-dispatcher.ts"],
+      "description": "Create event listener that looks up active webhooks for an event type and enqueues delivery jobs. Skip webhooks marked as failing. Check for deleted webhooks before enqueuing.",
+      "validation": "Event fires, matching webhooks receive delivery jobs, deleted webhooks are skipped"
+    }
+  ],
+
+  "coverage": {
+    "FR-001": ["TASK-001", "TASK-002", "TASK-006"],
+    "FR-002": ["TASK-002", "TASK-005"],
+    "FR-003": ["TASK-004"],
+    "FR-004": ["TASK-003"],
+    "NFR-001": ["TASK-004", "TASK-006"],
+    "NFR-002": ["TASK-004"],
+    "NFR-003": ["TASK-005"],
+    "EC-001": ["TASK-004"],
+    "EC-002": ["TASK-004"],
+    "EC-003": ["TASK-003", "TASK-006"]
+  },
+
+  "waves": [
+    { "wave": 1, "tasks": ["TASK-001"] },
+    { "wave": 2, "tasks": ["TASK-002", "TASK-003", "TASK-004"] },
+    { "wave": 3, "tasks": ["TASK-005"] },
+    { "wave": 4, "tasks": ["TASK-006"] }
+  ]
+}

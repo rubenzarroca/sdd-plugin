@@ -1,0 +1,134 @@
+{
+  "feature": "lead-scoring",
+  "version": "1.0",
+  "status": "clarified",
+  "created": "2025-10-20",
+  "updated": "2025-10-28",
+  "prd_reference": "specs/prd.md",
+
+  "requirements": {
+    "functional": [
+      { "id": "FR-001", "text": "Score calculation uses a weighted formula: score = Σ(factor_weight × factor_value) where factors include demographic fit, behavioral signals, and engagement recency" },
+      { "id": "FR-002", "text": "Leads are classified into three tiers based on configurable thresholds: Hot (>= hot_threshold), Warm (>= warm_threshold and < hot_threshold), Cold (< warm_threshold)" },
+      { "id": "FR-003", "text": "Scoring weights and thresholds are stored in a configuration table, editable via an admin API without deployment" },
+      { "id": "FR-004", "text": "Scores recalculate when any input factor changes (CRM field update, form submission, email engagement event)" },
+      { "id": "FR-005", "text": "Score changes that cross a tier boundary trigger an in-app notification to the assigned sales rep" },
+      { "id": "FR-006", "text": "The scoring report endpoint returns lead distribution by tier and conversion rates for a given date range" },
+      { "id": "FR-007", "text": "All score calculations are logged with input factors, weights used, and final score for auditability" }
+    ],
+    "non_functional": [
+      { "id": "NFR-001", "text": "Score calculation P95 latency < 200ms per lead" },
+      { "id": "NFR-002", "text": "Batch re-scoring (when weights change) must complete within 5 minutes for up to 10,000 active leads" },
+      { "id": "NFR-003", "text": "Score history retained for 12 months for audit and accuracy analysis" },
+      { "id": "NFR-004", "text": "Configuration changes are audit-logged with who changed what and when" },
+      { "id": "NFR-005", "text": "The scoring endpoint must handle 50 concurrent scoring requests without degradation" }
+    ],
+    "edge_cases": [
+      { "id": "EC-001", "scenario": "Lead has no optional factors filled", "behavior": "Return score of 0, tier cold. Do not fail — log warning for sales ops team" },
+      { "id": "EC-002", "scenario": "Scoring weights changed while batch re-score is in progress", "behavior": "Queue new re-score job after current one completes. Do not cancel in-progress job" },
+      { "id": "EC-003", "scenario": "Two CRM events arrive for same lead within 1 second", "behavior": "Deduplicate by lead_id with 2-second debounce window. Only most recent event triggers scoring" },
+      { "id": "EC-004", "scenario": "Redis cache is unavailable", "behavior": "Fall back to PostgreSQL direct reads. Dashboard slower (200ms → ~500ms) but functional. Log cache miss" },
+      { "id": "EC-005", "scenario": "Config update sets hot_threshold lower than warm_threshold", "behavior": "Reject with 400 error: Hot threshold must be greater than warm threshold" },
+      { "id": "EC-006", "scenario": "Score calculation produces value outside 0-100 range", "behavior": "Clamp to 0-100. Log alert — indicates weight configuration error" }
+    ]
+  },
+
+  "data_models": [
+    {
+      "entity": "Lead",
+      "fields": [
+        { "name": "id", "type": "uuid", "required": true, "description": "Primary key" },
+        { "name": "email", "type": "string", "required": true, "description": "Lead's email address" },
+        { "name": "company_size", "type": "enum(small, medium, large, enterprise)", "required": false, "description": "Demographic factor" },
+        { "name": "budget_declared", "type": "integer", "required": false, "description": "Budget in USD, self-reported" },
+        { "name": "source", "type": "string", "required": true, "description": "How the lead arrived (organic, paid, referral)" },
+        { "name": "assigned_rep_id", "type": "uuid", "required": false, "description": "Sales rep assigned to this lead" },
+        { "name": "created_at", "type": "timestamp", "required": true, "description": "When the lead entered the system" }
+      ]
+    },
+    {
+      "entity": "LeadScore",
+      "fields": [
+        { "name": "id", "type": "uuid", "required": true, "description": "Primary key" },
+        { "name": "lead_id", "type": "uuid", "required": true, "description": "FK to Lead" },
+        { "name": "score", "type": "integer", "required": true, "description": "Calculated score (0-100)" },
+        { "name": "tier", "type": "enum(hot, warm, cold)", "required": true, "description": "Derived from score and thresholds" },
+        { "name": "factors", "type": "jsonb", "required": true, "description": "Snapshot of input factors and weights used" },
+        { "name": "calculated_at", "type": "timestamp", "required": true, "description": "When this score was computed" }
+      ]
+    },
+    {
+      "entity": "ScoringConfig",
+      "fields": [
+        { "name": "id", "type": "uuid", "required": true, "description": "Primary key" },
+        { "name": "factor_name", "type": "string", "required": true, "description": "Name of the scoring factor" },
+        { "name": "weight", "type": "decimal", "required": true, "description": "Weight multiplied by factor value" },
+        { "name": "hot_threshold", "type": "integer", "required": true, "description": "Score >= this = hot tier" },
+        { "name": "warm_threshold", "type": "integer", "required": true, "description": "Score >= this = warm tier" },
+        { "name": "updated_by", "type": "uuid", "required": true, "description": "Who last changed this config" },
+        { "name": "updated_at", "type": "timestamp", "required": true, "description": "When it was last changed" }
+      ]
+    }
+  ],
+
+  "api_contracts": [
+    {
+      "method": "POST",
+      "path": "/leads/{id}/score",
+      "purpose": "Trigger score calculation for a specific lead",
+      "response_code": 200,
+      "errors": [
+        { "code": 404, "meaning": "Lead ID not found" },
+        { "code": 422, "meaning": "Lead has insufficient data for scoring" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/scoring/config",
+      "purpose": "Retrieve current scoring weights and thresholds",
+      "response_code": 200,
+      "errors": []
+    },
+    {
+      "method": "PUT",
+      "path": "/scoring/config",
+      "purpose": "Update scoring weights and/or thresholds. Triggers async re-scoring.",
+      "request": { "factors": "array", "thresholds": "object" },
+      "response_code": 200,
+      "errors": [
+        { "code": 400, "meaning": "Invalid weight (negative or > 100) or invalid threshold" },
+        { "code": 403, "meaning": "User does not have scoring admin permissions" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/scoring/report",
+      "purpose": "Lead distribution and conversion rates by tier for a date range",
+      "response_code": 200,
+      "errors": []
+    }
+  ],
+
+  "clarifications": [
+    {
+      "id": "C-1",
+      "type": "ambiguity",
+      "question": "Where does budget_declared come from? Is it a CRM field, a form input, or derived?",
+      "answer": "It's a field in the lead intake form. Free-text number field, stored as integer in the CRM."
+    },
+    {
+      "id": "C-2",
+      "type": "assumption",
+      "question": "FR-005 says trigger a notification when a tier boundary is crossed. What channel?",
+      "answer": "In-app notification for v1. Slack integration later as a separate feature."
+    },
+    {
+      "id": "C-3",
+      "type": "edge_case",
+      "question": "What happens if two sales ops managers update scoring config simultaneously?",
+      "answer": "Last write wins. No optimistic locking for v1 — only 2 people with config access."
+    }
+  ],
+
+  "open_questions_count": 3
+}

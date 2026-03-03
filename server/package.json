@@ -1,0 +1,21 @@
+{
+  "name": "sdd-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for SDD (Specification-Driven Development) — deterministic state machine enforcement",
+  "type": "module",
+  "bin": {
+    "sdd-server": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
