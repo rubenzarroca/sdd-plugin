@@ -1,7 +1,7 @@
 {
   "name": "sdd",
   "description": "Specification-Driven Development — a structured workflow for Claude Code that enforces specify → clarify → plan → tasks → implement → validate before writing code.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "Rubén Zarroca"
   },
