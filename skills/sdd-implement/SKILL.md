@@ -1,7 +1,7 @@
 ---
 name: sdd-implement
 description: "Execute a single task from the SDD task list. Use when the user says 'implement task', 'execute task', 'build task', 'do TASK-001', 'next task', 'start implementing', or wants to work on a specific task. Most tightly scoped command — reads only the task and its listed files."
-argument-hint: "[TASK-NNN]"
+argument-hint: "[TASK-NNN] [--pair]"
 user-invokable: true
 ---
 
@@ -24,9 +24,11 @@ During implementation, the user shifts from active participant to observer. They
    - `2+`: Minimal — announce what you're building in one line, report results. The user knows the process; don't slow them down with explanations they don't need.
 6. **Role-transition coaching.** Check `.sdd/state.json` field `milestones.role_transition_explained`. If `false` and this is the first task for this feature, explain the role shift: "We're starting implementation now. From here, I'll work through each task one at a time and report what I built. Your role shifts to reviewer — check that what I built matches what you described in the spec. If anything looks wrong or confusing, stop me and ask." Then set `milestones.role_transition_explained` to `true`. On subsequent features, skip — the user knows the drill.
 
-## Step 1: Parse task ID
+## Step 1: Parse task ID and flags
 
-Parse the task ID from `$ARGUMENTS` (e.g., `TASK-003`).
+Parse the task ID from `$ARGUMENTS` (e.g., `TASK-003`). Also check if `$ARGUMENTS` contains the `--pair` flag.
+
+If `--pair` is present, enable pair-programming mode (see "Pair-Programming Mode" section below). The flag does not affect Steps 1-4 or Steps 6-8 — it only modifies Step 5.
 
 If no task ID is provided:
 
@@ -201,6 +203,66 @@ Feature progress: {N}/{M} tasks completed
 ```
 
 Then stop. Do NOT suggest or execute the next task.
+
+---
+
+## Pair-Programming Mode (`--pair`)
+
+Pair-programming mode is activated ONLY when `$ARGUMENTS` contains the `--pair` flag. Without this flag, implementation behavior is identical to the standard flow described above — no changes whatsoever.
+
+### What --pair does
+
+Instead of implementing the complete task autonomously, Claude generates the file structure, imports, boilerplate, and configuration — but leaves the core business logic sections for the user to complete. The user writes the "interesting parts"; Claude handles the scaffolding.
+
+### How markers work
+
+Insert markers in the code where the user should write logic. Use the appropriate comment syntax for the file type:
+
+- JavaScript/TypeScript: `// TU TURNO: {instruction}`
+- Python: `# TU TURNO: {instruction}`
+- HTML/JSX: `{/* TU TURNO: {instruction} */}`
+- CSS: `/* TU TURNO: {instruction} */`
+- Other: use the language's single-line comment syntax
+
+### Marker rules
+
+1. **Maximum 3 markers per file.** If the file has more than 3 business-logic sections, choose the 3 most important. Implement the rest yourself.
+2. **Zero markers in boilerplate files.** If the file is purely configuration, imports, type definitions, or infrastructure (e.g., database migrations, route definitions, middleware setup), implement it fully with zero markers. Markers go only in files with business logic.
+3. **Each marker includes the instruction.** The marker must tell the user what to write. Never leave a bare `// TU TURNO` without context.
+
+### Calibrate marker difficulty
+
+Read `.sdd/state.json` field `completed_features`:
+
+- **`0-1` (first two features):** Markers are simple and include a hint.
+  ```typescript
+  // TU TURNO: Calculate the lead score using the weighted formula.
+  // Hint: multiply each factor's value by its weight from scoringConfig,
+  // then sum the results. Clamp the final score to 0-100.
+  ```
+
+- **`2+` (experienced user):** Markers are more open — describe the goal, not the approach.
+  ```typescript
+  // TU TURNO: Implement the scoring calculation.
+  // Input: lead (Lead), config (ScoringConfig[])
+  // Output: { score: number, factors: FactorBreakdown[] }
+  ```
+
+### After generating pair-mode files
+
+Report the same Step 8 format, but add a section:
+
+```
+Pair mode: {N} markers placed across {M} files.
+  - {file1}:{line} — {marker summary}
+  - {file2}:{line} — {marker summary}
+
+Complete the TU TURNO sections and let me know when you're ready for validation.
+```
+
+Do NOT run validation (Step 6) in pair mode. The user must complete their sections first. When the user says they're done, THEN run the validation from Step 6.
+
+---
 
 ## Restrictions
 

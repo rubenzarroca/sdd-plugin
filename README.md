@@ -44,7 +44,9 @@ After installing, open any project and run `/sdd:init` to set up the SDD structu
 /sdd:plan auth                 → Generates technical plan + ADR
 /sdd:tasks auth                → Decomposes plan into atomic tasks (5-15 min each)
 /sdd:implement TASK-001        → Implements ONE task, validates, stops
+/sdd:implement TASK-002 --pair → Pair mode: Claude scaffolds, you write the business logic
 /sdd:validate auth             → Drift detection: spec vs code, constitution compliance
+/sdd:retro auth                → (Optional) Quick debrief after completing a feature
 ```
 
 Every step requires your explicit approval before moving to the next. Claude never auto-advances.
@@ -87,6 +89,8 @@ Decomposes the plan into atomic tasks. Each task has an ID, title, description, 
 
 Executes one task at a time. Claude reads only the specific task and its listed files (minimal context budget). If it discovers something needed that isn't covered by the task, it reports a blocker instead of implementing it. If validation fails, it retries up to 3 times before asking for help. Never advances to the next task automatically.
 
+**Pair-programming mode (`--pair`):** Add the `--pair` flag to any implement command (e.g., `/sdd:implement TASK-003 --pair`). Claude generates the file structure, imports, and boilerplate, but leaves `// TU TURNO:` markers in the business logic sections for you to complete. The difficulty of markers adapts to your experience — simpler hints on your first features, more open-ended on later ones. Maximum 3 markers per file, zero on config or boilerplate files. Without the flag, implementation works exactly as before.
+
 ### 7. Validate (`/sdd:validate`)
 
 Drift detection. Compares the spec against the implementation and checks constitution compliance. Reports three things: which requirements are covered, which are missing, and which code doesn't correspond to any requirement (orphan code). For constitution, verifies imports against the allowed list, checks for prohibited patterns, and validates testing standards.
@@ -102,6 +106,10 @@ The constitution wins over CLAUDE.md in conflicts. It's the highest authority in
 ### `/sdd:status`
 
 Session recovery. Shows the active feature, current state, task progress, last completed task, session notes, and any pending alerts. Designed to be the first thing you run when opening a new session. Reads only `state.json` — the lightest command in the plugin.
+
+### `/sdd:retro`
+
+Post-feature retrospective. Run it manually after completing a feature — it's never suggested automatically and never blocks anything. Reads the coaching profile and transition history from state.json, presents a 3-5 line summary of what changed in your profile during the feature, and asks exactly 2 reflective questions. Saves the result to `specs/{feature}/retro.md`. Think of it as a 2-minute debrief, not an exam.
 
 ## State machine
 
@@ -142,10 +150,14 @@ your-project/
 │   └── [feature-name]/
 │       ├── spec.md           ← Feature specification
 │       ├── plan.md           ← Technical plan
-│       └── tasks.md          ← Task decomposition
+│       ├── tasks.md          ← Task decomposition
+│       └── retro.md          ← Post-feature retrospective (optional)
 └── docs/
-    └── adr/
-        └── 001-[title].md    ← Architecture Decision Records
+    ├── adr/
+    │   └── 001-[title].md    ← Architecture Decision Records
+    └── examples/
+        ├── spec-simple.md    ← Annotated example: simple webhook spec
+        └── spec-complex.md   ← Annotated example: scoring engine spec
 ```
 
 Everything is plain text (markdown + JSON), git-friendly, and produces readable diffs.
@@ -184,6 +196,8 @@ The coaching fades as you improve. Once you start writing quantified requirement
 
 This approach means that people with strong business context and product taste — but limited technical vocabulary — can produce implementation-ready specs from day one, while building technical literacy organically.
 
+**Want to see what a finished spec looks like?** Check out the annotated examples in `docs/examples/` — a simple webhook spec and a complex scoring engine spec, with inline learning notes explaining why each section is written the way it is.
+
 ## Plugin structure
 
 ```
@@ -207,16 +221,22 @@ sdd-plugin/
 │   │   └── SKILL.md
 │   ├── sdd-validate/
 │   │   └── SKILL.md
+│   ├── sdd-retro/
+│   │   └── SKILL.md
 │   ├── sdd-constitution/
 │   │   └── SKILL.md
 │   └── sdd-status/
 │       └── SKILL.md
+├── docs/
+│   └── examples/
+│       ├── spec-simple.md
+│       └── spec-complex.md
 └── README.md
 ```
 
 ## Version
 
-0.2.0 — PRD skill, 11-section specify methodology with integrated coaching, requirement ID traceability.
+0.3.0 — Post-feature retrospective, pair-programming mode, annotated example specs.
 
 ## Author
 
