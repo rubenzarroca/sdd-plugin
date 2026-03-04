@@ -1,0 +1,104 @@
+{
+  "service": "clearbit",
+  "base_url": "https://person.clearbit.com",
+  "auth": {
+    "type": "bearer",
+    "header": "Authorization",
+    "notes": "Use API key as Bearer token. Format: 'Bearer sk_xxxx'. Key is project-scoped, not user-scoped."
+  },
+  "rate_limits": {
+    "rpm": 600,
+    "rps": null,
+    "notes": "600 requests per minute per API key. Returns 429 with Retry-After header when exceeded."
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/v2/combined/find",
+      "purpose": "Look up a person and their company by email address",
+      "request": {
+        "query_params": {
+          "email": "string — required — email address to look up"
+        }
+      },
+      "response": {
+        "person": {
+          "id": "string",
+          "email": "string",
+          "name": {
+            "fullName": "string",
+            "givenName": "string",
+            "familyName": "string"
+          },
+          "employment": {
+            "name": "string — company name",
+            "title": "string — job title",
+            "role": "string — standardized role",
+            "seniority": "string — entry, manager, director, executive"
+          }
+        },
+        "company": {
+          "id": "string",
+          "name": "string",
+          "domain": "string",
+          "category": {
+            "sector": "string",
+            "industryGroup": "string",
+            "industry": "string",
+            "subIndustry": "string"
+          },
+          "metrics": {
+            "employees": "integer — total employee count",
+            "employeesRange": "string — e.g. '51-250'",
+            "estimatedAnnualRevenue": "string — e.g. '$10M-$50M'"
+          },
+          "tech": ["string — technology stack detected"]
+        }
+      },
+      "errors": [
+        { "code": 401, "meaning": "Invalid or missing API key" },
+        { "code": 404, "meaning": "Person or company not found for this email" },
+        { "code": 422, "meaning": "Invalid email format" },
+        { "code": 429, "meaning": "Rate limit exceeded. Check Retry-After header" }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/companies/find",
+      "purpose": "Look up a company by domain",
+      "request": {
+        "query_params": {
+          "domain": "string — required — company domain to look up"
+        }
+      },
+      "response": {
+        "id": "string",
+        "name": "string",
+        "domain": "string",
+        "category": {
+          "sector": "string",
+          "industryGroup": "string",
+          "industry": "string"
+        },
+        "metrics": {
+          "employees": "integer",
+          "employeesRange": "string",
+          "estimatedAnnualRevenue": "string"
+        }
+      },
+      "errors": [
+        { "code": 401, "meaning": "Invalid or missing API key" },
+        { "code": 404, "meaning": "Company not found for this domain" },
+        { "code": 422, "meaning": "Invalid domain format" },
+        { "code": 429, "meaning": "Rate limit exceeded" }
+      ]
+    }
+  ],
+  "sdk": {
+    "package": "clearbit",
+    "version": "^2.0.0",
+    "notes": "npm install clearbit. Initialize with: const clearbit = require('clearbit')('sk_xxxx'). SDK wraps REST endpoints but does not handle rate limiting — implement your own."
+  },
+  "fetched_at": "2025-10-21T09:15:00Z",
+  "source_url": "https://dashboard.clearbit.com/docs"
+}

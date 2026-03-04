@@ -26,7 +26,7 @@ SDD embeds a complete learning cycle into the development workflow. You don't st
 
 **3. Reflection** — After completing a feature, `/sdd:retro` presents a short summary of how your coaching profile changed during the feature and asks exactly 2 reflective questions. It's a 2-minute debrief, not an exam. The goal is to consolidate what you learned so it sticks.
 
-**4. Annotated examples** — `docs/examples/` contains two reference specs (a simple webhook and a complex scoring engine) with inline learning notes explaining *why* each section is written the way it is. These serve as self-study material and a target to aim for.
+**4. Annotated examples** — `docs/examples/` contains two reference specs (a simple webhook and a complex scoring engine with external API integration) with inline learning notes explaining *why* each section is written the way it is. The complex example includes a Clearbit API dependency to demonstrate the full external API workflow: cached docs, rate limiting, and graceful degradation. These serve as self-study material and a target to aim for.
 
 This approach means that people with strong business context and product taste — but limited technical vocabulary — can produce implementation-ready specs from day one, while building technical literacy organically. And experienced developers get a structured workflow without condescending tutorials.
 
@@ -175,25 +175,33 @@ After init, your project will have:
 
 ```
 your-project/
-├── CLAUDE.md                 ← Entry point for Claude (< 60 lines)
-├── constitution.md           ← Non-negotiable principles (verifiable rules)
+├── CLAUDE.md                        ← Entry point for Claude (< 60 lines)
+├── constitution.md                  ← Non-negotiable principles (verifiable rules)
 ├── .sdd/
-│   ├── state.json            ← Workflow state machine + coaching profile
-│   ├── hooks.json            ← Hook config (PrePlan enabled by default)
-│   └── api-docs/             ← Cached external API documentation (gitignored)
+│   ├── state.json                   ← Workflow state machine + coaching profile
+│   ├── hooks.json                   ← Hook config (PrePlan enabled by default)
+│   └── api-docs/                    ← Cached external API documentation (gitignored)
+│       └── {service}.json           ← e.g., clearbit.json, stripe.json
 ├── specs/
-│   ├── prd.md                ← Product Requirements Document (optional)
+│   ├── prd.md                       ← Product Requirements Document (optional)
 │   └── [feature-name]/
-│       ├── spec.md           ← Feature specification
-│       ├── plan.md           ← Technical plan
-│       ├── tasks.md          ← Task decomposition
-│       └── retro.md          ← What you learned (optional)
+│       ├── spec.md                  ← Feature specification
+│       ├── spec.json                ← Structured version (for MCP tools)
+│       ├── plan.md                  ← Technical plan
+│       ├── tasks.md                 ← Task decomposition
+│       ├── tasks.json               ← Structured version (for MCP tools)
+│       └── retro.md                 ← What you learned (optional)
 └── docs/
     ├── adr/
-    │   └── 001-[title].md    ← Architecture Decision Records
+    │   └── 001-[title].md           ← Architecture Decision Records
     └── examples/
-        ├── spec-simple.md    ← Annotated example: simple webhook spec
-        └── spec-complex.md   ← Annotated example: scoring engine spec
+        ├── spec-simple.md           ← Annotated example: webhook spec
+        ├── spec-simple.json         ← Structured version (reference)
+        ├── spec-complex.md          ← Annotated example: scoring engine + external API
+        ├── spec-complex.json        ← Structured version (reference)
+        ├── tasks-simple.json        ← Task decomposition example
+        ├── tasks-complex.json       ← Task decomposition with API integration task
+        └── api-docs-clearbit.json   ← Example of cached API docs from /sdd:api-docs
 ```
 
 Everything is plain text (markdown + JSON), git-friendly, and produces readable diffs.
@@ -324,7 +332,12 @@ sdd-plugin/
 ├── docs/
 │   └── examples/
 │       ├── spec-simple.md
-│       └── spec-complex.md
+│       ├── spec-simple.json
+│       ├── spec-complex.md
+│       ├── spec-complex.json
+│       ├── tasks-simple.json
+│       ├── tasks-complex.json
+│       └── api-docs-clearbit.json
 └── README.md
 ```
 

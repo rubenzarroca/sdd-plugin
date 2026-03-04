@@ -71,6 +71,9 @@ The scoring engine automates lead qualification using a weighted formula based o
 - **FR-005:** Score changes that cross a tier boundary trigger a notification to the assigned sales rep.
 - **FR-006:** The scoring report endpoint returns lead distribution by tier and conversion rates for a given date range.
 - **FR-007:** All score calculations are logged with input factors, weights used, and final score for auditability.
+- **FR-008:** When a new lead is created, the system calls the Clearbit Enrichment API to fetch firmographic data (company size, industry, employee count) and stores it as scoring factors.
+
+<!-- LEARNING NOTE: FR-008 introduces a dependency on an external API. This is where /sdd:api-docs becomes critical — before planning, you must cache the real API documentation so Claude builds against the actual contract, not against training data that may be outdated. Run `/sdd:api-docs clearbit` before `/sdd:plan`. -->
 
 ## 6. Non-Functional Requirements
 
@@ -79,6 +82,7 @@ The scoring engine automates lead qualification using a weighted formula based o
 - **NFR-003:** Score history retained for 12 months for audit and accuracy analysis.
 - **NFR-004:** Configuration changes are audit-logged with who changed what and when.
 - **NFR-005:** The scoring endpoint must handle 50 concurrent scoring requests without degradation.
+- **NFR-006:** Enrichment API calls must respect the external rate limit (600 requests/min). Use a queue with rate limiting to prevent 429 responses.
 
 <!-- LEARNING NOTE: Compare NFR-001 ("P95 latency < 200ms") with a vague version like "must be fast." The quantified version tells the implementer exactly what to optimize for and gives the test a pass/fail threshold. Every NFR should answer: "How would I write a test that checks this?" -->
 
@@ -87,12 +91,17 @@ The scoring engine automates lead qualification using a weighted formula based o
 ### Stack
 - Runtime: Node.js 20 (LTS)
 - Database: PostgreSQL 15 via Prisma ORM
-- Queue: BullMQ for async re-scoring jobs
+- Queue: BullMQ for async re-scoring jobs and enrichment rate limiting
 - Cache: Redis for hot score lookups
+- External API: Clearbit Enrichment API (cached docs: `.sdd/api-docs/clearbit.json`)
 
 ### Architecture
 ```
-[CRM/Form Events] → [Event Handler] → [Scoring Service] → [Score DB]
+[CRM/Form Events] → [Event Handler] → [Enrichment Queue] → [Clearbit API]
+                                              ↓                    ↓
+                                    [Scoring Service] ← [Enriched Data]
+                                              ↓
+                                       [Score DB]
                                               ↓
                                     [Notification Service] → [Sales Rep]
                                               ↓
@@ -246,8 +255,11 @@ The scoring engine automates lead qualification using a weighted formula based o
 | EC-004 | Redis cache is unavailable | Fall back to PostgreSQL direct reads. Dashboard will be slower (200ms → ~500ms) but functional. Log the cache miss for monitoring. |
 | EC-005 | Config update sets hot_threshold lower than warm_threshold | Reject with 400 error: "Hot threshold must be greater than warm threshold." |
 | EC-006 | Score calculation produces a value outside 0-100 range | Clamp to 0-100. Log an alert — this indicates a weight configuration error. |
+| EC-007 | Clearbit Enrichment API is unavailable or returns an error | Score the lead with available data only. Do not block lead creation. Queue a retry for enrichment. Log the failure for monitoring. |
 
-<!-- LEARNING NOTE: This spec has 6 edge cases covering different failure modes: missing data (EC-001), race conditions (EC-002, EC-003), infrastructure failure (EC-004), invalid configuration (EC-005), and arithmetic overflow (EC-006). A simpler feature might need only 3, but a scoring engine touches many systems. The rule of thumb: if you can imagine a support ticket about it, it needs an edge case. -->
+<!-- LEARNING NOTE: EC-007 is the external API failure case — the most common source of production incidents in integrations. The key principle: never let an external dependency block your core flow. Scoring with partial data is better than not scoring at all. This pattern is called "graceful degradation."
+
+This spec has 7 edge cases covering different failure modes: missing data (EC-001), race conditions (EC-002, EC-003), infrastructure failure (EC-004), invalid configuration (EC-005), arithmetic overflow (EC-006), and external API failure (EC-007). A simpler feature might need only 3, but a scoring engine that integrates with external services touches many systems. The rule of thumb: if you can imagine a support ticket about it, it needs an edge case. -->
 
 ## 11. Open Questions
 

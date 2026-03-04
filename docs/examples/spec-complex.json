@@ -14,14 +14,16 @@
       { "id": "FR-004", "text": "Scores recalculate when any input factor changes (CRM field update, form submission, email engagement event)" },
       { "id": "FR-005", "text": "Score changes that cross a tier boundary trigger an in-app notification to the assigned sales rep" },
       { "id": "FR-006", "text": "The scoring report endpoint returns lead distribution by tier and conversion rates for a given date range" },
-      { "id": "FR-007", "text": "All score calculations are logged with input factors, weights used, and final score for auditability" }
+      { "id": "FR-007", "text": "All score calculations are logged with input factors, weights used, and final score for auditability" },
+      { "id": "FR-008", "text": "When a new lead is created, the system calls the Clearbit Enrichment API to fetch firmographic data (company size, industry, employee count) and stores it as scoring factors" }
     ],
     "non_functional": [
       { "id": "NFR-001", "text": "Score calculation P95 latency < 200ms per lead" },
       { "id": "NFR-002", "text": "Batch re-scoring (when weights change) must complete within 5 minutes for up to 10,000 active leads" },
       { "id": "NFR-003", "text": "Score history retained for 12 months for audit and accuracy analysis" },
       { "id": "NFR-004", "text": "Configuration changes are audit-logged with who changed what and when" },
-      { "id": "NFR-005", "text": "The scoring endpoint must handle 50 concurrent scoring requests without degradation" }
+      { "id": "NFR-005", "text": "The scoring endpoint must handle 50 concurrent scoring requests without degradation" },
+      { "id": "NFR-006", "text": "Enrichment API calls must respect the external rate limit (600 requests/min). Use a queue with rate limiting to prevent 429 responses" }
     ],
     "edge_cases": [
       { "id": "EC-001", "scenario": "Lead has no optional factors filled", "behavior": "Return score of 0, tier cold. Do not fail — log warning for sales ops team" },
@@ -29,7 +31,8 @@
       { "id": "EC-003", "scenario": "Two CRM events arrive for same lead within 1 second", "behavior": "Deduplicate by lead_id with 2-second debounce window. Only most recent event triggers scoring" },
       { "id": "EC-004", "scenario": "Redis cache is unavailable", "behavior": "Fall back to PostgreSQL direct reads. Dashboard slower (200ms → ~500ms) but functional. Log cache miss" },
       { "id": "EC-005", "scenario": "Config update sets hot_threshold lower than warm_threshold", "behavior": "Reject with 400 error: Hot threshold must be greater than warm threshold" },
-      { "id": "EC-006", "scenario": "Score calculation produces value outside 0-100 range", "behavior": "Clamp to 0-100. Log alert — indicates weight configuration error" }
+      { "id": "EC-006", "scenario": "Score calculation produces value outside 0-100 range", "behavior": "Clamp to 0-100. Log alert — indicates weight configuration error" },
+      { "id": "EC-007", "scenario": "Clearbit Enrichment API is unavailable or returns an error", "behavior": "Score the lead with available data only. Do not block lead creation. Queue a retry for enrichment. Log the failure" }
     ]
   },
 
